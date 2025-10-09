@@ -46,25 +46,23 @@
                 <th>售票情況</th>
             </tr>
             </thead>
-            <tbody>
-            <tr>
-                <td>沙丘：第二部</td>
-                <td>18:40</td>
-                <td>1 號廳</td>
-                <td class="status-open">76% 座位已售</td>
+            <tbody th:if="${!showtimeSummaries.isEmpty()}">
+            <tr th:each="summary : ${showtimeSummaries}">
+                <td th:text="${summary.movieTitle}">沙丘：第二部</td>
+                <td th:text="${summary.showtime}">18:40</td>
+                <td th:text="${summary.hall}">1 號廳</td>
+                <td>
+                    <span th:text="${summary.percentage} + '% 座位已售 (' + ${summary.soldSeats} + ' / ' + ${summary.totalSeats} + ')'"
+                          th:class="${summary.percentage > 85 ? 'status-critical' : (summary.percentage > 60 ? 'status-open' : 'status-low')}">
+                        76% 座位已售 (73 / 96)
+                    </span>
+                </td>
             </tr>
-            <tr>
-                <td>芭比</td>
-                <td>20:30</td>
-                <td>2 號廳</td>
-                <td class="status-low">42% 座位已售</td>
-            </tr>
-            <tr>
-                <td>捍衛任務4</td>
-                <td>22:15</td>
-                <td>3 號廳</td>
-                <td class="status-critical">91% 座位已售</td>
-            </tr>
+            </tbody>
+            <tbody th:if="${showtimeSummaries.isEmpty()}">
+                <tr>
+                    <td colspan="4" style="text-align: center;">目前沒有可顯示的場次資訊。</td>
+                </tr>
             </tbody>
         </table>
     </section>

@@ -1,8 +1,13 @@
 package com.example.cinema.controller;
 
 import com.example.cinema.config.SessionConstants;
+import com.example.cinema.dto.ShowtimeSummary;
+import com.example.cinema.model.Movie;
+import com.example.cinema.model.SeatLayout;
+import com.example.cinema.model.Showtime;
 import com.example.cinema.service.LoginAttemptService;
 import com.example.cinema.service.LoginAttemptService.LoginAttemptStatus;
+import com.example.cinema.service.MovieService;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +20,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -30,9 +37,11 @@ public class PageController {
     private static final Duration SESSION_TIMEOUT = Duration.ofMinutes(10);
 
     private final LoginAttemptService loginAttemptService;
+    private final MovieService movieService;
 
-    public PageController(LoginAttemptService loginAttemptService) {
+    public PageController(LoginAttemptService loginAttemptService, MovieService movieService) {
         this.loginAttemptService = loginAttemptService;
+        this.movieService = movieService;
     }
 
     // 首頁和電影相關頁面使用 React SPA
@@ -145,7 +154,32 @@ public class PageController {
             return "redirect:/employee/login";
         }
         updateLastActivity(session, SessionConstants.EMPLOYEE_LAST_ACTIVITY);
-        populateEmployeeModel(model);
+
+        model.addAttribute("title", "很好睡電影院員工後台");
+        model.addAttribute("message", "即時場次狀態，協助團隊順利營運。");
+
+        List<ShowtimeSummary> summaries = new ArrayList<>();
+        List<Movie> movies = movieService.getMovies();
+
+        for (Movie movie : movies) {
+            for (Showtime showtime : movie.getShowtimes()) {
+                SeatLayout seatLayout = movieService.getShowtimeDetails(movie.getId(), showtime.getId()).getSeatLayout();
+                long soldSeats = seatLayout.getSeats().stream().filter(s -> s.isReserved()).count();
+                int totalSeats = seatLayout.getRows() * seatLayout.getColumns();
+                int percentage = totalSeats > 0 ? (int) (soldSeats * 100 / totalSeats) : 0;
+
+                summaries.add(new ShowtimeSummary(
+                        movie.getTitle(),
+                        showtime.getStartTime(),
+                        showtime.getAuditorium(),
+                        (int) soldSeats,
+                        totalSeats,
+                        percentage
+                ));
+            }
+        }
+        model.addAttribute("showtimeSummaries", summaries);
+
         return "employee";
     }
 
@@ -228,10 +262,7 @@ public class PageController {
         model.addAttribute("message", "歡迎回來！查看您的專屬優惠與即將到來的電影體驗。");
     }
 
-    private void populateEmployeeModel(Model model) {
-        model.addAttribute("title", "很好睡電影院員工後台");
-        model.addAttribute("message", "掌握場次狀態、排班資訊與日常待辦，協助團隊順利營運。");
-    }
+
 
     private boolean hasValidMemberSession(HttpSession session) {
         if (!Boolean.TRUE.equals(session.getAttribute(SessionConstants.MEMBER_SESSION_KEY))) {
