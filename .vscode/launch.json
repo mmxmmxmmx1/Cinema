@@ -1,0 +1,12 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "CinemaApplication",
+            "request": "launch",
+            "mainClass": "com.example.cinema.CinemaApplication",
+            "projectName": "cinema"
+        }
+    ]
+}
