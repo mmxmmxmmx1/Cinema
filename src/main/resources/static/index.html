@@ -4,7 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>很好睡電影院</title>
-    <link rel="stylesheet" href="css/styles.css">
+    <!--
+      Use absolute paths for static assets.  When Vue Router is configured with HTML5 history mode,
+      reloading a deep-linked URL (e.g. "/movies/123") causes the browser to request the same path
+      from the server.  Spring Boot is configured to always return this index page for unknown
+      resources.  However, relative paths like "css/styles.css" or "js/app.js" will then be resolved
+      relative to the current URL (e.g. "/movies/123/css/styles.css"), which does not exist.
+      This results in the CSS/JS failing to load and the page appearing blank (a black screen) on a
+      hard reload (Ctrl + Shift + R).  Prefixing the paths with a leading slash makes them absolute
+      and ensures they are resolved from the root of the application regardless of the current
+      location.
+    -->
+    <link rel="stylesheet" href="/css/styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
@@ -13,6 +24,6 @@
 <div id="root"></div>
 <script src="https://unpkg.com/vue@3.3.4/dist/vue.global.js"></script>
 <script src="https://unpkg.com/vue-router@4.2.4/dist/vue-router.global.js"></script>
-<script src="js/app.js"></script>
+    <script src="/js/app.js"></script>
 </body>
 </html>

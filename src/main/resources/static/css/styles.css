@@ -244,6 +244,7 @@ a {
     width: 100%;
     border-radius: 18px;
     box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5);
+    margin-top: 90px;
 }
 
 .movie-detail-card h2 {
@@ -662,7 +663,7 @@ a {
 /* 把海報區塊往上拉 50px，等於把原本約 100px 的間距縮成一半 */
 @media (min-width: 641px) {
   .app-shell > .movie-grid {
-    margin-top: -45px;
+    margin-top: -90px;
   }
 }
 

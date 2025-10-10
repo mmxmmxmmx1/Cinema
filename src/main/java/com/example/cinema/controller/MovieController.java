@@ -1,5 +1,6 @@
 package com.example.cinema.controller;
 
+import com.example.cinema.dto.MovieDto;
 import com.example.cinema.model.Movie;
 import com.example.cinema.model.ShowtimeDetails;
 import com.example.cinema.service.MovieService;
@@ -27,8 +28,8 @@ public class MovieController {
     }
 
     @GetMapping("/{movieId}")
-    public ResponseEntity<Movie> getMovie(@PathVariable String movieId) {
-        return movieService.getMovie(movieId)
+    public ResponseEntity<MovieDto> getMovie(@PathVariable String movieId) {
+        return movieService.getMovieDto(movieId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }

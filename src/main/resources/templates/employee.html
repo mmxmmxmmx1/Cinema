@@ -7,6 +7,10 @@
         body { font-family: "Noto Sans TC", "Segoe UI", Arial, sans-serif; margin: 0; background: #0f1424; color: #f8f9ff; }
         header { padding: 30px 40px; background: linear-gradient(135deg, #26304f, #1d263d); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); }
         h1 { margin: 0; font-size: 26px; }
+        .todo-header { display: flex; align-items: center; }
+        .todo-header h2 { flex: 0 0 25%; margin: 0; }
+        #edit-todo-btn { background: #00BBFF !important; color: #fff; font-size: 14px; padding: 6px 16px; margin-top: 0; border: none; font-weight: 600; }
+        #edit-todo-btn:hover { filter: brightness(1.1); }
         main { padding: 36px 40px; display: grid; gap: 20px; }
         section { background: rgba(255, 255, 255, 0.04); border-radius: 14px; padding: 22px; border: 1px solid rgba(255, 255, 255, 0.08); }
         table { width: 100%; border-collapse: collapse; margin-top: 12px; }
@@ -24,16 +28,28 @@
 <body>
 <header>
     <h1 th:text="${title}">很好睡電影院員工後台</h1>
-    <p th:text="${message}">掌握排班、影廳狀態與當日任務，讓營運順暢無阻。</p>
+    <p th:text="${message}">掌握影廳狀態與當日任務，讓營運順暢無阻。</p>
 </header>
 <main>
-    <section>
-        <h2>今日待辦</h2>
-        <ul>
-            <li>08:30 — 影廳巡檢與音響測試</li>
-            <li>12:30 — 售票櫃台交接</li>
-            <li>16:45 — 小賣部盤點</li>
-        </ul>
+    <section id="todo-section">
+        <div class="todo-header">
+            <h2>今日待辦</h2>
+            <button id="edit-todo-btn" class="edit-btn">編輯</button>
+        </div>
+        <div id="todo-view">
+            <ul>
+                <li>08:30 — 影廳巡檢與音響測試</li>
+                <li>12:30 — 售票櫃台交接</li>
+                <li>16:45 — 小賣部盤點</li>
+            </ul>
+        </div>
+        <div id="todo-edit" style="display: none;">
+            <textarea style="width: 98%; height: 90px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); border-radius: 8px; color: #fff; padding: 10px; font-family: inherit; font-size: 14px; resize: vertical;"></textarea>
+            <div style="margin-top: 12px; display: flex; gap: 10px;">
+                <button id="save-todo-btn">儲存</button>
+                <button id="cancel-todo-btn" style="background: #555;">取消</button>
+            </div>
+        </div>
     </section>
     <section>
         <h2>場次概況</h2>
@@ -71,7 +87,6 @@
         <ul>
             <li><a href="#">更新影廳檢查表</a></li>
             <li><a href="#">提交維修申請</a></li>
-            <li><a href="#">查詢下週排班</a></li>
         </ul>
     </section>
     <form method="post" action="/employee/logout">
@@ -81,6 +96,7 @@
     <a href="/">← 返回首頁</a>
 </main>
 <script>
+    // Auto-logout script
     (function() {
         const logoutForm = document.getElementById('employee-auto-logout');
         if (!logoutForm) return;
@@ -127,6 +143,47 @@
         });
 
         sendHeartbeat();
+    })();
+
+    // To-Do list editing script
+    (function() {
+        const section = document.getElementById('todo-section');
+        if (!section) return;
+
+        const viewMode = section.querySelector('#todo-view');
+        const editMode = section.querySelector('#todo-edit');
+        const editBtn = section.querySelector('#edit-todo-btn');
+        const saveBtn = section.querySelector('#save-todo-btn');
+        const cancelBtn = section.querySelector('#cancel-todo-btn');
+        const textarea = editMode.querySelector('textarea');
+        const ul = viewMode.querySelector('ul');
+
+        editBtn.addEventListener('click', () => {
+            const items = Array.from(ul.querySelectorAll('li')).map(li => li.textContent.trim());
+            textarea.value = items.join('\n');
+            viewMode.style.display = 'none';
+            editMode.style.display = 'block';
+            editBtn.style.display = 'none';
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            viewMode.style.display = 'block';
+            editMode.style.display = 'none';
+            editBtn.style.display = 'block';
+        });
+
+        saveBtn.addEventListener('click', () => {
+            const newItems = textarea.value.split('\n').filter(line => line.trim() !== '');
+            ul.innerHTML = '';
+            newItems.forEach(itemText => {
+                const li = document.createElement('li');
+                li.textContent = itemText;
+                ul.appendChild(li);
+            });
+            viewMode.style.display = 'block';
+            editMode.style.display = 'none';
+            editBtn.style.display = 'block';
+        });
     })();
 </script>
 </body>

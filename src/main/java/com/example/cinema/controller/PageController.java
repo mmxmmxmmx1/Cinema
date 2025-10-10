@@ -44,11 +44,6 @@ public class PageController {
         this.movieService = movieService;
     }
 
-    // 首頁和電影相關頁面使用 React SPA
-    @GetMapping({"/", "/movies/**"})
-    public String forwardSpa() {
-        return "forward:/index.html";
-    }
 
     // 會員登入頁面使用靜態 HTML（獨立頁面）
     @GetMapping({"/member/login", "/member/login/"})
