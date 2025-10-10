@@ -11,7 +11,7 @@
       resources.  However, relative paths like "css/styles.css" or "js/app.js" will then be resolved
       relative to the current URL (e.g. "/movies/123/css/styles.css"), which does not exist.
       This results in the CSS/JS failing to load and the page appearing blank (a black screen) on a
-      hard reload (Ctrl + Shift + R).  Prefixing the paths with a leading slash makes them absolute
+      hard reload (Ctrl + Shift + R).  Prefixing the paths with a leading slash makes them absolute
       and ensures they are resolved from the root of the application regardless of the current
       location.
     -->
@@ -19,11 +19,189 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+/* 啟動畫面主容器 */
+#splash-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.8s ease, visibility 0.8s ease;
+}
+
+/* 啟動畫面淡出效果 */
+#splash-screen.fade-out {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* 內容容器 */
+.splash-content {
+  text-align: center;
+  animation: fadeInUp 1.2s ease-out;
+}
+
+/* 電影院名稱 */
+.cinema-title {
+  font-size: 3.5rem;
+  color: #fff;
+  font-weight: 700;
+  margin: 0 0 2rem 0;
+  letter-spacing: 0.1em;
+  animation: titleGlow 2s ease-in-out infinite alternate;
+  font-family: 'Noto Sans TC', sans-serif;
+}
+
+/* 標語 */
+.tagline {
+  font-size: 1.2rem;
+  color: #b8b8b8;
+  margin-top: 2rem;
+  animation: fadeIn 1.5s ease-in 0.5s both;
+  font-family: 'Noto Sans TC', sans-serif;
+}
+
+/* 載入動畫容器 */
+.spinner-wrapper {
+  margin: 2rem auto;
+}
+
+/* 旋轉載入圖示 */
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
+}
+
+/* 關鍵幀動畫：旋轉 */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 關鍵幀動畫：淡入向上 */
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 關鍵幀動畫：淡入 */
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* 關鍵幀動畫：發光效果 */
+@keyframes titleGlow {
+  0% {
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.3),
+                 0 0 20px rgba(255, 255, 255, 0.2);
+  }
+  100% {
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.5),
+                 0 0 30px rgba(255, 255, 255, 0.3),
+                 0 0 40px rgba(255, 255, 255, 0.2);
+  }
+}
+
+/* 主內容初始隱藏 */
+#root {
+  opacity: 0;
+  transition: opacity 0.6s ease-in;
+}
+
+#root.show {
+  opacity: 1;
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+  .cinema-title {
+    font-size: 2.5rem;
+  }
+  
+  .tagline {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .cinema-title {
+    font-size: 2rem;
+  }
+  
+  .tagline {
+    font-size: 0.9rem;
+  }
+}
+</style>
+
 </head>
 <body>
+  
+<!-- 啟動畫面（漸進式首頁） -->
+<div id="splash-screen">
+  <div class="splash-content">
+    <h1 class="cinema-title">很好睡電影院</h1>
+    <div class="spinner-wrapper">
+      <div class="spinner"></div>
+    </div>
+    <p class="tagline">每個顧客都可以睡得很安穩</p>
+  </div>
+</div>
+
+<!-- 主要應用內容 -->
 <div id="root"></div>
+
+<!-- Vue.js 和 Vue Router -->
 <script src="https://unpkg.com/vue@3.3.4/dist/vue.global.js"></script>
 <script src="https://unpkg.com/vue-router@4.2.4/dist/vue-router.global.js"></script>
-    <script src="/js/app.js"></script>
+
+<!-- 啟動畫面控制腳本 -->
+<script>
+(function(){
+  // 啟動畫面控制邏輯
+  document.addEventListener('DOMContentLoaded', function() {
+    const splashScreen = document.getElementById('splash-screen');
+    const appContent = document.getElementById('root');
+    
+    // 設定啟動畫面顯示時間（2.5秒）
+    setTimeout(function() {
+      // 添加淡出類別
+      splashScreen.classList.add('fade-out');
+      
+      // 等待淡出動畫完成後顯示主內容
+      setTimeout(function() {
+        splashScreen.style.display = 'none';
+        appContent.classList.add('show');
+      }, 800); // 與CSS transition時間相同
+      
+    }, 2500);
+  });
+})();
+</script>
+
+<!-- 主要應用程式 -->
+<script src="/js/app.js"></script>
+
 </body>
 </html>

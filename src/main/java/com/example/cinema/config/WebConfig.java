@@ -14,6 +14,17 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        // 設定靜態資源路徑
+        registry.addResourceHandler("/css/**")
+                .addResourceLocations("classpath:/static/css/");
+        
+        registry.addResourceHandler("/js/**")
+                .addResourceLocations("classpath:/static/js/");
+        
+        registry.addResourceHandler("/images/**")
+                .addResourceLocations("classpath:/static/images/");
+        
+        // Vue Router History Mode 支援：所有未匹配路由都返回 index.html
         registry.addResourceHandler("/**")
                 .addResourceLocations("classpath:/static/")
                 .resourceChain(true)
@@ -21,8 +32,9 @@ public class WebConfig implements WebMvcConfigurer {
                     @Override
                     protected Resource getResource(String resourcePath, Resource location) throws IOException {
                         Resource requestedResource = location.createRelative(resourcePath);
-                        return requestedResource.exists() && requestedResource.isReadable() ? requestedResource
-                                : new ClassPathResource("/static/index.html");
+                        return requestedResource.exists() && requestedResource.isReadable() 
+                            ? requestedResource 
+                            : new ClassPathResource("/static/index.html");
                     }
                 });
     }
