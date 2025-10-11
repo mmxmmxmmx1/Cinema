@@ -52,29 +52,26 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .authorizeHttpRequests(auth -> auth
+                // Allow public access to the home page and static resources
                 .requestMatchers("/", "/index.html", "/css/**", "/js/**", "/images/**").permitAll()
                 .requestMatchers("/api/movies/**").permitAll()
-                // permit login pages with slash style
-                .requestMatchers("/member/login", "/member/login/**").permitAll()
-                .requestMatchers("/employee/login", "/employee/login/**").permitAll()
-                .requestMatchers("/login", "/logout").permitAll()
+                // Allow all member‑ and employee‑related pages so custom session logic can handle authentication
+                .requestMatchers("/member/**").permitAll()
+                .requestMatchers("/employee/**").permitAll()
+                // Require authentication for any other requests
                 .anyRequest().authenticated()
             )
             .csrf(csrf -> csrf.ignoringRequestMatchers(
+                // Disable CSRF for these endpoints to allow custom login/logout
                 "/employee/**", "/member/**", "/api/**"
             ))
-            .formLogin(form -> form
-                .loginProcessingUrl("/member/login")
-                .loginPage("/member/login") // keep your custom member login page if used elsewhere
-                .loginProcessingUrl("/login")
-                .defaultSuccessUrl("/member", true)
-                .permitAll()
-            )
             .logout(logout -> logout
                 .logoutUrl("/logout")
                 .logoutSuccessUrl("/")
                 .permitAll()
             );
+        // Disable Spring Security's default form login as we handle login manually in controllers
+        http.formLogin().disable();
         return http.build();
     }
 }
