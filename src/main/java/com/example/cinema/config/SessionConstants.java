@@ -13,4 +13,5 @@ public final class SessionConstants {
     public static final String EMPLOYEE_LOCK_UNTIL = "employeeLoginLockUntil";
     public static final String MEMBER_LAST_ACTIVITY = "memberLastActivity";
     public static final String EMPLOYEE_LAST_ACTIVITY = "employeeLastActivity";
+    public static final String GUEST_WATCHLIST = "GUEST_WATCHLIST";
 }

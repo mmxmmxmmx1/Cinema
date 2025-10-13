@@ -11,6 +11,8 @@ import com.example.cinema.service.MovieService;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.web.WebAttributes;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -47,7 +49,9 @@ public class PageController {
 
     // 會員登入頁面使用靜態 HTML（獨立頁面）
     @GetMapping({"/member/login", "/member/login/"})
-    public String memberLoginPage(HttpSession session, Model model) {
+    public String memberLoginPage(@RequestParam(value = "error", required = false) String error,
+                                  HttpSession session,
+                                  Model model) {
         if (hasValidMemberSession(session)) {
             updateLastActivity(session, SessionConstants.MEMBER_LAST_ACTIVITY);
             return "redirect:/member";
@@ -56,6 +60,20 @@ public class PageController {
                 SessionConstants.MEMBER_ATTEMPT_COUNT);
         if (lockRemaining != null) {
             applyLockMessage(model, lockRemaining);
+        }
+        if (error != null && model.getAttribute("error") == null) {
+            if (session != null) {
+                session.removeAttribute(WebAttributes.AUTHENTICATION_EXCEPTION);
+                String txt = (String) session.getAttribute("memberLoginErrorText");
+                if (txt != null && !txt.isBlank()) {
+                    model.addAttribute("error", txt);
+                    session.removeAttribute("memberLoginErrorText");
+                } else {
+                    model.addAttribute("error", "帳號或密碼錯誤，請再試一次。");
+                }
+            } else {
+                model.addAttribute("error", "帳號或密碼錯誤，請再試一次。");
+            }
         }
         return "member-login";
     }
@@ -129,7 +147,8 @@ public class PageController {
     }
 
     @GetMapping({"/employee/login", "/employee/login/"})
-    public String employeeLoginPage(HttpSession session, Model model) {
+    public String employeeLoginPage(@RequestParam(value = "error", required = false) String error,
+                                    HttpSession session, Model model) {
         if (hasValidEmployeeSession(session)) {
             updateLastActivity(session, SessionConstants.EMPLOYEE_LAST_ACTIVITY);
             return "redirect:/employee";
@@ -138,6 +157,14 @@ public class PageController {
                 SessionConstants.EMPLOYEE_ATTEMPT_COUNT);
         if (lockRemaining != null) {
             applyLockMessage(model, lockRemaining);
+        } else if (error != null && model.getAttribute("error") == null) {
+            String txt = (String) session.getAttribute("employeeLoginErrorText");
+            if (txt != null && !txt.isBlank()) {
+                model.addAttribute("error", txt);
+                session.removeAttribute("employeeLoginErrorText");
+            } else {
+                model.addAttribute("error", "帳號或密碼錯誤，請再試一次。");
+            }
         }
         return "employee-login";
     }

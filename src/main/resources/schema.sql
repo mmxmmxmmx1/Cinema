@@ -1,0 +1,38 @@
+SET FOREIGN_KEY_CHECKS=0;
+
+DROP TABLE IF EXISTS member_roles;
+DROP TABLE IF EXISTS roles;
+DROP TABLE IF EXISTS members;
+
+-- Members table
+CREATE TABLE IF NOT EXISTS members (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  first_name VARCHAR(50) NOT NULL,
+  last_name VARCHAR(50) NOT NULL,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  phone VARCHAR(20) NULL,
+  password VARCHAR(68) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Roles table
+CREATE TABLE IF NOT EXISTS roles (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  code VARCHAR(50) NOT NULL UNIQUE,
+  name VARCHAR(100) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Member to Role mapping
+CREATE TABLE IF NOT EXISTS member_roles (
+  member_id BIGINT NOT NULL,
+  role_id BIGINT NOT NULL,
+  PRIMARY KEY (member_id, role_id),
+  CONSTRAINT fk_member_roles_member
+    FOREIGN KEY (member_id) REFERENCES members(id)
+    ON DELETE CASCADE,
+  CONSTRAINT fk_member_roles_role
+    FOREIGN KEY (role_id) REFERENCES roles(id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+SET FOREIGN_KEY_CHECKS=1;
+

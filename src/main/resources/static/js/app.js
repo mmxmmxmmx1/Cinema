@@ -298,7 +298,8 @@ const SeatSelectionPage = {
 const routes = [
   { path: '/', component: HomePage },
   { path: '/movies/:movieId', component: MovieDetailPage },
-  { path: '/movies/:movieId/showtimes/:showtimeId', component: SeatSelectionPage }
+  { path: '/movies/:movieId/showtimes/:showtimeId', component: SeatSelectionPage },
+  { path: '/:pathMatch(.*)*', redirect: '/' }
 ];
 
 const router = createRouter({
