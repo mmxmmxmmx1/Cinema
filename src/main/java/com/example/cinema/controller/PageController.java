@@ -90,52 +90,7 @@ public class PageController {
         return "member";
     }
 
-    @PostMapping("/member/login")
-    public String handleMemberLogin(@RequestParam String username,
-                                    @RequestParam String password,
-                                    HttpSession session,
-                                    Model model) {
-        String attemptKey = buildAttemptKey("member", username);
-        Duration sessionLock = remainingLockDuration(session, SessionConstants.MEMBER_LOCK_UNTIL,
-                SessionConstants.MEMBER_ATTEMPT_COUNT);
-        if (sessionLock != null) {
-            applyLockMessage(model, sessionLock);
-            return "member-login";
-        }
-
-        LoginAttemptStatus status = loginAttemptService.getStatus(attemptKey);
-        if (status.locked()) {
-            enforceGlobalLock(session, SessionConstants.MEMBER_LOCK_UNTIL,
-                    SessionConstants.MEMBER_ATTEMPT_COUNT, status.lockDuration());
-            applyLockMessage(model, status.lockDuration());
-            return "member-login";
-        }
-
-        if (MEMBER_USERNAME.equals(username) && MEMBER_PASSWORD.equals(password)) {
-            loginAttemptService.registerSuccess(attemptKey);
-            establishMemberSession(session);
-            resetAttempts(session, SessionConstants.MEMBER_ATTEMPT_COUNT, SessionConstants.MEMBER_LOCK_UNTIL);
-            return "redirect:/member";
-        }
-        LoginAttemptStatus afterFailure = loginAttemptService.registerFailure(attemptKey);
-        int attempts = incrementAttempts(session, SessionConstants.MEMBER_ATTEMPT_COUNT);
-        if (attempts >= MAX_ATTEMPTS) {
-            Duration lockDuration = afterFailure.locked()
-                    ? afterFailure.lockDuration()
-                    : LOCK_DURATION;
-            Instant lockUntil = enforceLock(session, SessionConstants.MEMBER_LOCK_UNTIL, lockDuration);
-            session.setAttribute(SessionConstants.MEMBER_ATTEMPT_COUNT, MAX_ATTEMPTS);
-            applyLockMessage(model, Duration.between(Instant.now(), lockUntil));
-        } else if (afterFailure.locked()) {
-            Instant lockUntil = enforceLock(session, SessionConstants.MEMBER_LOCK_UNTIL, afterFailure.lockDuration());
-            session.setAttribute(SessionConstants.MEMBER_ATTEMPT_COUNT, MAX_ATTEMPTS);
-            applyLockMessage(model, Duration.between(Instant.now(), lockUntil));
-        } else {
-            int remaining = Math.max(0, MAX_ATTEMPTS - attempts);
-            model.addAttribute("error", formatRemainingAttemptsMessage(remaining));
-        }
-        return "member-login";
-    }
+    // POST /member/login 已由 Spring Security 接管
 
     @PostMapping("/member/logout")
     public String handleMemberLogout(HttpSession session) {
@@ -205,61 +160,9 @@ public class PageController {
         return "employee";
     }
 
-    @PostMapping("/employee/login")
-    public String handleEmployeeLogin(@RequestParam String username,
-                                      @RequestParam String password,
-                                      HttpSession session,
-                                      Model model) {
-        String attemptKey = buildAttemptKey("employee", username);
-        Duration sessionLock = remainingLockDuration(session, SessionConstants.EMPLOYEE_LOCK_UNTIL,
-                SessionConstants.EMPLOYEE_ATTEMPT_COUNT);
-        if (sessionLock != null) {
-            applyLockMessage(model, sessionLock);
-            return "employee-login";
-        }
+    // POST /employee/login 已由 Spring Security 接管
 
-        LoginAttemptStatus status = loginAttemptService.getStatus(attemptKey);
-        if (status.locked()) {
-            enforceGlobalLock(session, SessionConstants.EMPLOYEE_LOCK_UNTIL,
-                    SessionConstants.EMPLOYEE_ATTEMPT_COUNT, status.lockDuration());
-            applyLockMessage(model, status.lockDuration());
-            return "employee-login";
-        }
-
-        if (EMPLOYEE_USERNAME.equals(username) && EMPLOYEE_PASSWORD.equals(password)) {
-            loginAttemptService.registerSuccess(attemptKey);
-            establishEmployeeSession(session);
-            resetAttempts(session, SessionConstants.EMPLOYEE_ATTEMPT_COUNT, SessionConstants.EMPLOYEE_LOCK_UNTIL);
-            return "redirect:/employee";
-        }
-        LoginAttemptStatus afterFailure = loginAttemptService.registerFailure(attemptKey);
-        int attempts = incrementAttempts(session, SessionConstants.EMPLOYEE_ATTEMPT_COUNT);
-        if (attempts >= MAX_ATTEMPTS) {
-            Duration lockDuration = afterFailure.locked()
-                    ? afterFailure.lockDuration()
-                    : LOCK_DURATION;
-            Instant lockUntil = enforceLock(session, SessionConstants.EMPLOYEE_LOCK_UNTIL, lockDuration);
-            session.setAttribute(SessionConstants.EMPLOYEE_ATTEMPT_COUNT, MAX_ATTEMPTS);
-            applyLockMessage(model, Duration.between(Instant.now(), lockUntil));
-        } else if (afterFailure.locked()) {
-            Instant lockUntil = enforceLock(session, SessionConstants.EMPLOYEE_LOCK_UNTIL, afterFailure.lockDuration());
-            session.setAttribute(SessionConstants.EMPLOYEE_ATTEMPT_COUNT, MAX_ATTEMPTS);
-            applyLockMessage(model, Duration.between(Instant.now(), lockUntil));
-        } else {
-            int remaining = Math.max(0, MAX_ATTEMPTS - attempts);
-            model.addAttribute("error", formatRemainingAttemptsMessage(remaining));
-        }
-        return "employee-login";
-    }
-
-    @PostMapping("/employee/logout")
-    public String handleEmployeeLogout(HttpSession session) {
-        session.removeAttribute(SessionConstants.EMPLOYEE_SESSION_KEY);
-        session.removeAttribute(SessionConstants.EMPLOYEE_ACCESS_TOKEN);
-        resetAttempts(session, SessionConstants.EMPLOYEE_ATTEMPT_COUNT, SessionConstants.EMPLOYEE_LOCK_UNTIL);
-        session.removeAttribute(SessionConstants.EMPLOYEE_LAST_ACTIVITY);
-        return "redirect:/";
-    }
+    // POST /employee/logout 已由 Spring Security 接管
 
     @PostMapping("/member/activity")
     public ResponseEntity<Void> memberActivity(HttpSession session) {
