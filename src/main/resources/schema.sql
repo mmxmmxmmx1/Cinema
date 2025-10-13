@@ -1,38 +1,46 @@
 SET FOREIGN_KEY_CHECKS=0;
 
-DROP TABLE IF EXISTS member_roles;
+DROP TABLE IF EXISTS user_watchlist;
+DROP TABLE IF EXISTS user_roles;
 DROP TABLE IF EXISTS roles;
-DROP TABLE IF EXISTS members;
+DROP TABLE IF EXISTS users;
 
--- Members table
-CREATE TABLE IF NOT EXISTS members (
+CREATE TABLE users (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  first_name VARCHAR(50) NOT NULL,
-  last_name VARCHAR(50) NOT NULL,
-  email VARCHAR(255) NOT NULL UNIQUE,
-  phone VARCHAR(20) NULL,
-  password VARCHAR(68) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  username VARCHAR(50) NOT NULL UNIQUE,
+  first_name VARCHAR(50),
+  last_name VARCHAR(50),
+  email VARCHAR(255) UNIQUE,
+  phone VARCHAR(20),
+  password VARCHAR(100) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Roles table
-CREATE TABLE IF NOT EXISTS roles (
+CREATE TABLE roles (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   code VARCHAR(50) NOT NULL UNIQUE,
   name VARCHAR(100) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Member to Role mapping
-CREATE TABLE IF NOT EXISTS member_roles (
-  member_id BIGINT NOT NULL,
+CREATE TABLE user_roles (
+  user_id BIGINT NOT NULL,
   role_id BIGINT NOT NULL,
-  PRIMARY KEY (member_id, role_id),
-  CONSTRAINT fk_member_roles_member
-    FOREIGN KEY (member_id) REFERENCES members(id)
+  PRIMARY KEY (user_id, role_id),
+  CONSTRAINT fk_user_roles_user
+    FOREIGN KEY (user_id) REFERENCES users(id)
     ON DELETE CASCADE,
-  CONSTRAINT fk_member_roles_role
+  CONSTRAINT fk_user_roles_role
     FOREIGN KEY (role_id) REFERENCES roles(id)
     ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE user_watchlist (
+  user_id BIGINT NOT NULL,
+  movie_id BIGINT NOT NULL,
+  PRIMARY KEY (user_id, movie_id),
+  CONSTRAINT fk_watchlist_user
+    FOREIGN KEY (user_id) REFERENCES users(id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS=1;
-

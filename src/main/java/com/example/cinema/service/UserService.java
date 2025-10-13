@@ -1,7 +1,11 @@
 package com.example.cinema.service;
 
-import com.example.cinema.dao.UserDao;
-import com.example.cinema.model.User;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -9,11 +13,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Objects;
-import java.util.Set;
-import java.util.stream.Collectors;
+import com.example.cinema.dao.UserDao;
+import com.example.cinema.model.User;
 
 @Service
 public class UserService {
@@ -125,4 +126,3 @@ public class UserService {
         }
     }
 }
-

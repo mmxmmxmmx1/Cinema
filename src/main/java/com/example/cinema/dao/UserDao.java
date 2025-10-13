@@ -35,11 +35,15 @@ public class UserDao {
 
             // 3. Create the final User object with roles
             User finalUser = new User(
-                user.getId(),
-                user.getUsername(),
-                user.getPasswordHash(),
-                user.getCreatedAt(),
-                roles
+                    user.getId(),
+                    user.getUsername(),
+                    user.getFirstName(),
+                    user.getLastName(),
+                    user.getEmail(),
+                    user.getPhone(),
+                    user.getPassword(),
+                    user.getCreatedAt(),
+                    roles
             );
             return Optional.of(finalUser);
 
@@ -54,7 +58,11 @@ public class UserDao {
             return new User(
                     rs.getLong("id"),
                     rs.getString("username"),
-                    rs.getString("password_hash"),
+                    rs.getString("first_name"),
+                    rs.getString("last_name"),
+                    rs.getString("email"),
+                    rs.getString("phone"),
+                    rs.getString("password"),
                     rs.getTimestamp("created_at").toLocalDateTime(),
                     null // Roles are loaded separately
             );
@@ -72,10 +80,10 @@ public class UserDao {
         }
     }
 
-    public Long createUser(String username, String passwordHash) {
+    public Long createUser(String username, String encodedPassword) {
         jdbcTemplate.update(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                username, passwordHash
+                "INSERT INTO users (username, password) VALUES (?, ?)",
+                username, encodedPassword
         );
         // 取得新 user 的 id（假設 username 為唯一鍵）
         return jdbcTemplate.queryForObject(
