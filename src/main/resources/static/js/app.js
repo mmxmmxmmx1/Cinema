@@ -16,11 +16,13 @@ const ErrorState = {
 const Hero = {
   template: `
     <header class="hero">
-      <span class="hero-label">現正熱映中</span>
-      <img class="hero-badge" src="/images/sleep.jpg" alt="Very Sleepy Cinema 徽章">
-      <div class="hero-text">
-        <h1>很好睡電影院</h1>
-        <p>每個顧客都可以睡得很安穩</p>
+      <div class="hero-inner">
+        <span class="hero-label">現正熱映中</span>
+        <img class="hero-badge" src="/images/sleep.jpg" alt="Very Sleepy Cinema 徽章">
+        <div class="hero-text">
+          <h1>很好睡電影院</h1>
+          <p>每個顧客都可以睡得很安穩</p>
+        </div>
       </div>
     </header>
   `
