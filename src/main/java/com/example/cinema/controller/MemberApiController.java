@@ -61,9 +61,7 @@ public class MemberApiController {
                 12450,
                 List.of(
                         new MemberBooking("Dune: Part Two", "12/08 18:40", "1 號廳"),
-                        new MemberBooking("Oppenheimer", "12/12 20:10", "2 號廳")
-                )
-        );
+                        new MemberBooking("Oppenheimer", "12/12 20:10", "2 號廳")));
         return ResponseEntity.ok(summary);
     }
 }

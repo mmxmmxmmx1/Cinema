@@ -14,7 +14,8 @@ import org.springframework.stereotype.Service;
 public class SessionService {
 
     public enum Realm {
-        MEMBER, EMPLOYEE
+        MEMBER,
+        EMPLOYEE
     }
 
     private static final String GUEST_WATCHLIST_KEY = "guestWatchlist";
@@ -128,10 +129,10 @@ public class SessionService {
 
     private String formatLockMessage(Duration duration) {
         long minutes = Math.max(1, (duration.getSeconds() + 59) / 60);
-        return "帳號已鎖定，請於 " + minutes + " 分鐘後再試。";
+        return "帳號已鎖定,請於 " + minutes + " 分鐘後再試。";
     }
 
     private String formatRemainingAttempts(int remaining) {
-        return "帳號或密碼不正確，還可以再嘗試 " + remaining + " 次。";
+        return "帳號或密碼不正確,還可以再嘗試 " + remaining + " 次。";
     }
 }

@@ -26,17 +26,18 @@
 <div class="login-panel">
     <div>
         <h1>很好睡電影院</h1>
-        <p>請登入員工帳號，即可管理影城資訊與每日待辦。</p>
+        <p>請登入員工帳號,即可管理影城資訊與每日待辦。</p>
     </div>
 
     <div th:if="${error}" class="error" th:attr="data-lock=${lockSeconds}">
-        <span th:text="${error}">帳號或密碼不正確，請再試一次。</span>
+        <span th:text="${error}">帳號或密碼不正確,請再試一次。</span>
         <div class="countdown-line" th:if="${lockSeconds}">
             剩餘時間：<span class="countdown-value">--:--</span>
         </div>
     </div>
 
     <form method="post" action="/employee/login">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
         <label>
             員工帳號
             <input type="text" name="username" placeholder="輸入帳號" autocomplete="username" required>

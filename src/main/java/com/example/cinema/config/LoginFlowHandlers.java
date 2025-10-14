@@ -10,6 +10,9 @@ import org.springframework.security.web.authentication.AuthenticationFailureHand
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+import java.util.function.Function;
+
 @Component
 public class LoginFlowHandlers {
 
@@ -32,8 +35,8 @@ public class LoginFlowHandlers {
     }
 
     public AuthenticationSuccessHandler successHandler(SessionService.Realm realm,
-                                                       String redirectTarget,
-                                                       SuccessCallback callback) {
+            String redirectTarget,
+            SuccessCallback callback) {
         return (request, response, authentication) -> {
             String username = authentication.getName();
             loginAttemptService.registerSuccess(realm, username);
@@ -47,6 +50,31 @@ public class LoginFlowHandlers {
         };
     }
 
+    public AuthenticationSuccessHandler roleAwareSuccessHandler(
+            SessionService.Realm baseRealm,
+            Function<Authentication, RoleResolution> resolver,
+            SuccessCallback callback) {
+        return (request, response, authentication) -> {
+            String username = authentication.getName();
+            loginAttemptService.registerSuccess(baseRealm, username);
+
+            HttpSession session = request.getSession(true);
+
+            RoleResolution resolution = resolver.apply(authentication);
+
+            for (SessionService.Realm realm : resolution.realms()) {
+                sessionService.establishSession(session, realm);
+                sessionService.resetAttempts(session, realm);
+            }
+
+            if (callback != null) {
+                callback.handle(session, authentication);
+            }
+
+            response.sendRedirect(resolution.redirectUrl());
+        };
+    }
+
     public SessionService sessionService() {
         return sessionService;
     }
@@ -54,5 +82,8 @@ public class LoginFlowHandlers {
     @FunctionalInterface
     public interface SuccessCallback {
         void handle(HttpSession session, Authentication authentication);
+    }
+
+    public record RoleResolution(String redirectUrl, List<SessionService.Realm> realms) {
     }
 }

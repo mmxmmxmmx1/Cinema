@@ -4,6 +4,13 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public class User {
+    
+    public enum UserType {
+        CUSTOMER,   // 純會員
+        EMPLOYEE,   // 純員工
+        BOTH        // 既是會員又是員工
+    }
+    
     private final Long id;
     private final String username;
     private final String firstName;
@@ -11,6 +18,7 @@ public class User {
     private final String email;
     private final String phone;
     private final String password;
+    private final UserType userType;
     private final LocalDateTime createdAt;
     private final List<Role> roles;
 
@@ -21,6 +29,7 @@ public class User {
                 String email,
                 String phone,
                 String password,
+                UserType userType,
                 LocalDateTime createdAt,
                 List<Role> roles) {
         this.id = id;
@@ -30,6 +39,7 @@ public class User {
         this.email = email;
         this.phone = phone;
         this.password = password;
+        this.userType = userType;
         this.createdAt = createdAt;
         this.roles = roles;
     }
@@ -62,11 +72,23 @@ public class User {
         return password;
     }
 
+    public UserType getUserType() {
+        return userType;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
     public List<Role> getRoles() {
         return roles;
+    }
+    
+    public boolean isCustomer() {
+        return userType == UserType.CUSTOMER || userType == UserType.BOTH;
+    }
+    
+    public boolean isEmployee() {
+        return userType == UserType.EMPLOYEE || userType == UserType.BOTH;
     }
 }

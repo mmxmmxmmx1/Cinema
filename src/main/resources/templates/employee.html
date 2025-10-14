@@ -1,40 +1,43 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-Hant" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title th:text="${title}">員工專區</title>
     <style>
         body { font-family: "Noto Sans TC", "Segoe UI", Arial, sans-serif; margin: 0; background: #0f1424; color: #f8f9ff; }
         header { padding: 30px 40px; background: linear-gradient(135deg, #26304f, #1d263d); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); }
         h1 { margin: 0; font-size: 26px; }
-        .todo-header { display: flex; align-items: center; }
-        .todo-header h2 { flex: 0 0 25%; margin: 0; }
-        #edit-todo-btn { background: #00BBFF !important; color: #fff; font-size: 14px; padding: 6px 16px; margin-top: 0; border: none; font-weight: 600; }
+        .todo-header { display: flex; align-items: center; justify-content: space-between; }
+        .todo-header h2 { margin: 0; }
+        #edit-todo-btn { background: #00BBFF; color: #fff; font-size: 14px; padding: 8px 20px; border: none; font-weight: 600; border-radius: 6px; cursor: pointer; }
         #edit-todo-btn:hover { filter: brightness(1.1); }
-        main { padding: 36px 40px; display: grid; gap: 20px; }
+        main { padding: 36px 40px; display: grid; gap: 20px; max-width: 1400px; margin: 0 auto; }
         section { background: rgba(255, 255, 255, 0.04); border-radius: 14px; padding: 22px; border: 1px solid rgba(255, 255, 255, 0.08); }
         table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-        th, td { padding: 10px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: left; }
-        th { color: #9ad0ff; font-weight: 600; }
+        th, td { padding: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: left; }
+        th { color: #9ad0ff; font-weight: 600; background: rgba(154, 208, 255, 0.05); }
         a { color: #8ec7ff; text-decoration: none; }
         a:hover { text-decoration: underline; }
-        .status-open { color: #63e6be; }
-        .status-low { color: #ffd166; }
-        .status-critical { color: #ff6b6b; }
-        button { background: #3b7ddd; color: #fff; border: none; padding: 10px 24px; border-radius: 20px; cursor: pointer; margin-top: 12px; }
+        .status-open { color: #63e6be; font-weight: 500; }
+        .status-low { color: #ffd166; font-weight: 500; }
+        .status-critical { color: #ff6b6b; font-weight: 500; }
+        button { background: #3b7ddd; color: #fff; border: none; padding: 10px 24px; border-radius: 8px; cursor: pointer; margin-top: 12px; font-size: 14px; font-weight: 500; }
         button:hover { background: #5390ff; }
+        ul { padding-left: 20px; line-height: 2; }
+        li { margin-bottom: 8px; }
     </style>
 </head>
 <body>
 <header>
     <h1 th:text="${title}">很好睡電影院員工後台</h1>
-    <p th:text="${message}">掌握影廳狀態與當日任務，讓營運順暢無阻。</p>
+    <p th:text="${message}">掌握每日待辦與營運狀況</p>
 </header>
 <main>
     <section id="todo-section">
         <div class="todo-header">
             <h2>今日待辦</h2>
-            <button id="edit-todo-btn" class="edit-btn">編輯</button>
+            <button id="edit-todo-btn">編輯</button>
         </div>
         <div id="todo-view">
             <ul>
@@ -44,149 +47,151 @@
             </ul>
         </div>
         <div id="todo-edit" style="display: none;">
-            <textarea style="width: 98%; height: 90px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); border-radius: 8px; color: #fff; padding: 10px; font-family: inherit; font-size: 14px; resize: vertical;"></textarea>
+            <textarea style="width: 98%; height: 120px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); border-radius: 8px; color: #fff; padding: 12px; font-family: inherit; font-size: 14px; resize: vertical; line-height: 1.6;"></textarea>
             <div style="margin-top: 12px; display: flex; gap: 10px;">
                 <button id="save-todo-btn">儲存</button>
-                <button id="cancel-todo-btn" style="background: #555;">取消</button>
+                <button id="cancel-todo-btn" style="background: #666;">取消</button>
             </div>
         </div>
     </section>
+    
     <section>
         <h2>場次概況</h2>
         <table>
             <thead>
             <tr>
-                <th>電影</th>
+                <th>電影名稱</th>
                 <th>開演時間</th>
                 <th>影廳</th>
-                <th>售票情況</th>
+                <th>銷售狀況</th>
             </tr>
             </thead>
-            <tbody th:if="${!showtimeSummaries.isEmpty()}">
+            <tbody th:if="${showtimeSummaries != null and !showtimeSummaries.isEmpty()}">
             <tr th:each="summary : ${showtimeSummaries}">
-                <td th:text="${summary.movieTitle}">沙丘：第二部</td>
-                <td th:text="${summary.showtime}">18:40</td>
-                <td th:text="${summary.hall}">1 號廳</td>
+                <td th:text="${summary.movieTitle}">奧本海默</td>
+                <td th:text="${summary.showtime}">08:50</td>
+                <td th:text="${summary.hall}">0號廳</td>
                 <td>
                     <span th:text="${summary.percentage} + '% 座位已售 (' + ${summary.soldSeats} + ' / ' + ${summary.totalSeats} + ')'"
-                          th:class="${summary.percentage > 85 ? 'status-critical' : (summary.percentage > 60 ? 'status-open' : 'status-low')}">
-                        76% 座位已售 (73 / 96)
+                          th:classappend="${summary.percentage >= 85 ? 'status-critical' : (summary.percentage >= 60 ? 'status-open' : 'status-low')}">
+                        20% 座位已售 (20 / 96)
                     </span>
                 </td>
             </tr>
             </tbody>
-            <tbody th:if="${showtimeSummaries.isEmpty()}">
-                <tr>
-                    <td colspan="4" style="text-align: center;">目前沒有可顯示的場次資訊。</td>
-                </tr>
+            <tbody th:if="${showtimeSummaries == null or showtimeSummaries.isEmpty()}">
+            <tr>
+                <td colspan="4" style="text-align: center; padding: 20px; color: #999;">目前沒有場次資料</td>
+            </tr>
             </tbody>
         </table>
     </section>
+    
     <section>
         <h2>快速操作</h2>
         <ul>
             <li><a href="#">更新影廳檢查表</a></li>
             <li><a href="#">提交維修申請</a></li>
+            <li><a href="#">查看員工排班表</a></li>
         </ul>
     </section>
-    <form method="post" action="/employee/logout">
-        <button type="submit">登出員工帳號</button>
-    </form>
+    
+    <div style="display: flex; gap: 15px; align-items: center; margin-top: 20px;">
+        <form method="post" action="/employee/logout" style="margin: 0;">
+            <button type="submit">登出員工帳號</button>
+        </form>
+        <a href="/">返回首頁</a>
+    </div>
+    
     <form id="employee-auto-logout" method="post" action="/employee/logout" style="display: none;"></form>
-    <a href="/">← 返回首頁</a>
 </main>
+
 <script>
-    // Auto-logout script
-    (function() {
-        const logoutForm = document.getElementById('employee-auto-logout');
-        if (!logoutForm) return;
+(function() {
+    const logoutForm = document.getElementById('employee-auto-logout');
+    if (!logoutForm) return;
 
-        const INACTIVITY_LIMIT = 10 * 60 * 1000;
-        const HEARTBEAT_INTERVAL = 60 * 1000;
-        const events = ['click', 'mousemove', 'keydown', 'scroll', 'touchstart', 'touchmove'];
-        let triggered = false;
-        let lastHeartbeat = Date.now();
-        let timer = setTimeout(triggerLogout, INACTIVITY_LIMIT);
+    const INACTIVITY_LIMIT = 10 * 60 * 1000;
+    const HEARTBEAT_INTERVAL = 60 * 1000;
+    const events = ['click', 'mousemove', 'keydown', 'scroll', 'touchstart', 'touchmove'];
+    let triggered = false;
+    let lastHeartbeat = Date.now();
+    let timer = setTimeout(triggerLogout, INACTIVITY_LIMIT);
 
-        function resetTimer() {
-            if (triggered) return;
-            clearTimeout(timer);
-            timer = setTimeout(triggerLogout, INACTIVITY_LIMIT);
-            sendHeartbeat();
-        }
-
-        function triggerLogout() {
-            if (triggered) return;
-            triggered = true;
-            logoutForm.submit();
-        }
-
-        function sendHeartbeat() {
-            const now = Date.now();
-            if (now - lastHeartbeat < HEARTBEAT_INTERVAL) {
-                return;
-            }
-            lastHeartbeat = now;
-            if (navigator.sendBeacon) {
-                try {
-                    navigator.sendBeacon('/employee/activity', new Blob([], { type: 'text/plain' }));
-                    return;
-                } catch (err) {
-                    // ignore and fall through
-                }
-            }
-            fetch('/employee/activity', { method: 'POST', keepalive: true }).catch(function() {});
-        }
-
-        events.forEach(function(evt) {
-            document.addEventListener(evt, resetTimer, { passive: true });
-        });
-
+    function resetTimer() {
+        if (triggered) return;
+        clearTimeout(timer);
+        timer = setTimeout(triggerLogout, INACTIVITY_LIMIT);
         sendHeartbeat();
-    })();
+    }
 
-    // To-Do list editing script
-    (function() {
-        const section = document.getElementById('todo-section');
-        if (!section) return;
+    function triggerLogout() {
+        if (triggered) return;
+        triggered = true;
+        logoutForm.submit();
+    }
 
-        const viewMode = section.querySelector('#todo-view');
-        const editMode = section.querySelector('#todo-edit');
-        const editBtn = section.querySelector('#edit-todo-btn');
-        const saveBtn = section.querySelector('#save-todo-btn');
-        const cancelBtn = section.querySelector('#cancel-todo-btn');
-        const textarea = editMode.querySelector('textarea');
-        const ul = viewMode.querySelector('ul');
+    function sendHeartbeat() {
+        const now = Date.now();
+        if (now - lastHeartbeat < HEARTBEAT_INTERVAL) return;
+        lastHeartbeat = now;
+        
+        if (navigator.sendBeacon) {
+            try {
+                navigator.sendBeacon('/employee/activity', new Blob([], { type: 'text/plain' }));
+                return;
+            } catch (err) {}
+        }
+        fetch('/employee/activity', { method: 'POST', keepalive: true }).catch(() => {});
+    }
 
-        editBtn.addEventListener('click', () => {
-            const items = Array.from(ul.querySelectorAll('li')).map(li => li.textContent.trim());
-            textarea.value = items.join('\n');
-            viewMode.style.display = 'none';
-            editMode.style.display = 'block';
-            editBtn.style.display = 'none';
+    events.forEach(evt => {
+        document.addEventListener(evt, resetTimer, { passive: true });
+    });
+
+    sendHeartbeat();
+})();
+
+(function() {
+    const section = document.getElementById('todo-section');
+    if (!section) return;
+
+    const viewMode = section.querySelector('#todo-view');
+    const editMode = section.querySelector('#todo-edit');
+    const editBtn = section.querySelector('#edit-todo-btn');
+    const saveBtn = section.querySelector('#save-todo-btn');
+    const cancelBtn = section.querySelector('#cancel-todo-btn');
+    const textarea = editMode.querySelector('textarea');
+    const ul = viewMode.querySelector('ul');
+
+    editBtn.addEventListener('click', () => {
+        const items = Array.from(ul.querySelectorAll('li')).map(li => li.textContent.trim());
+        textarea.value = items.join('\n');
+        viewMode.style.display = 'none';
+        editMode.style.display = 'block';
+        editBtn.style.display = 'none';
+        textarea.focus();
+    });
+
+    cancelBtn.addEventListener('click', () => {
+        viewMode.style.display = 'block';
+        editMode.style.display = 'none';
+        editBtn.style.display = 'inline-block';
+    });
+
+    saveBtn.addEventListener('click', () => {
+        const lines = textarea.value.split('\n').filter(line => line.trim());
+        ul.innerHTML = '';
+        lines.forEach(line => {
+            const li = document.createElement('li');
+            li.textContent = line.trim();
+            ul.appendChild(li);
         });
-
-        cancelBtn.addEventListener('click', () => {
-            viewMode.style.display = 'block';
-            editMode.style.display = 'none';
-            editBtn.style.display = 'block';
-        });
-
-        saveBtn.addEventListener('click', () => {
-            const newItems = textarea.value.split('\n').filter(line => line.trim() !== '');
-            ul.innerHTML = '';
-            newItems.forEach(itemText => {
-                const li = document.createElement('li');
-                li.textContent = itemText;
-                ul.appendChild(li);
-            });
-            viewMode.style.display = 'block';
-            editMode.style.display = 'none';
-            editBtn.style.display = 'block';
-        });
-    })();
+        viewMode.style.display = 'block';
+        editMode.style.display = 'none';
+        editBtn.style.display = 'inline-block';
+    });
+})();
 </script>
 </body>
 </html>
-
-

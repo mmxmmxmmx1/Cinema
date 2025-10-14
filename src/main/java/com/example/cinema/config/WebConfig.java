@@ -15,9 +15,11 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addViewControllers(ViewControllerRegistry registry) {
+        // Forward the root path to the SPA entry point. Do **not** forward
+        // '/login' or '/post-login' here so that the dedicated login pages for
+        // members and employees can be served by their respective controllers.
+        // See PageController for member and employee login mappings.
         registry.addViewController("/").setViewName("forward:/index.html");
-        registry.addViewController("/login").setViewName("forward:/index.html");
-        registry.addViewController("/post-login").setViewName("forward:/index.html");
     }
 
     @Override
@@ -25,13 +27,13 @@ public class WebConfig implements WebMvcConfigurer {
         // 設定靜態資源路徑
         registry.addResourceHandler("/css/**")
                 .addResourceLocations("classpath:/static/css/");
-        
+
         registry.addResourceHandler("/js/**")
                 .addResourceLocations("classpath:/static/js/");
-        
+
         registry.addResourceHandler("/images/**")
                 .addResourceLocations("classpath:/static/images/");
-        
+
         // Vue Router History Mode 支援：所有未匹配路由都返回 index.html
         registry.addResourceHandler("/**")
                 .addResourceLocations("classpath:/static/")
@@ -40,9 +42,9 @@ public class WebConfig implements WebMvcConfigurer {
                     @Override
                     protected Resource getResource(String resourcePath, Resource location) throws IOException {
                         Resource requestedResource = location.createRelative(resourcePath);
-                        return requestedResource.exists() && requestedResource.isReadable() 
-                            ? requestedResource 
-                            : new ClassPathResource("/static/index.html");
+                        return requestedResource.exists() && requestedResource.isReadable()
+                                ? requestedResource
+                                : new ClassPathResource("/static/index.html");
                     }
                 });
     }

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${title}">管理後台</title>
+    <style>
+        body { font-family: "Noto Sans TC", "Segoe UI", Arial, sans-serif; margin: 0; background: #10152a; color: #f8f9ff; }
+        header { padding: 32px 48px; background: linear-gradient(135deg, #2d3c68, #1c2642); box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45); }
+        h1 { margin: 0; font-size: 28px; }
+        main { padding: 40px 48px; display: grid; gap: 22px; }
+        section { background: rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 24px; border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(6px); }
+        .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+        .metric-card { background: rgba(17, 25, 52, 0.6); padding: 20px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.1); }
+        .metric-card h3 { margin: 0 0 8px 0; font-size: 16px; color: #9ad0ff; }
+        .metric-card p { margin: 0; font-size: 28px; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        th, td { padding: 10px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); text-align: left; }
+        th { color: #9ad0ff; font-weight: 600; }
+        a { color: #8ec7ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        button { background: #3b7ddd; color: #fff; border: none; padding: 10px 24px; border-radius: 20px; cursor: pointer; margin-top: 12px; }
+        button:hover { background: #5390ff; }
+        .logout { display: inline-block; margin-top: 12px; }
+    </style>
+</head>
+<body>
+<header>
+    <h1 th:text="${title}">很好睡電影院管理中心</h1>
+    <p th:text="${message}">檢視營運指標、角色權限與系統公告。</p>
+</header>
+<main>
+    <section>
+        <h2>今日重點指標</h2>
+        <div class="metric-grid">
+            <div class="metric-card">
+                <h3>總銷售額</h3>
+                <p>NT$ 1,280,000</p>
+            </div>
+            <div class="metric-card">
+                <h3>累計觀影人次</h3>
+                <p>3,842</p>
+            </div>
+            <div class="metric-card">
+                <h3>當日退票</h3>
+                <p>12</p>
+            </div>
+        </div>
+    </section>
+    <section>
+        <h2>角色權限檢視</h2>
+        <table>
+            <thead>
+            <tr>
+                <th>角色</th>
+                <th>含意</th>
+                <th>人數</th>
+                <th>最近異動</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td>ROLE_ADMIN</td>
+                <td>管理者</td>
+                <td>4</td>
+                <td>2025-10-09 18:32</td>
+            </tr>
+            <tr>
+                <td>ROLE_EMPLOYEE</td>
+                <td>影城員工</td>
+                <td>28</td>
+                <td>2025-10-11 09:14</td>
+            </tr>
+            <tr>
+                <td>ROLE_IT</td>
+                <td>IT 維運</td>
+                <td>6</td>
+                <td>2025-10-10 22:05</td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+    <section>
+        <h2>系統公告</h2>
+        <ul>
+            <li>23:00 - 02:00 進行票務系統維護，請提前通知顧客。</li>
+            <li>新員工教育訓練簡報已上傳至知識庫。</li>
+        </ul>
+    </section>
+    <form class="logout" method="post" action="/logout">
+        <button type="submit">登出管理者帳號</button>
+    </form>
+    <form id="admin-auto-logout" method="post" action="/logout" style="display: none;"></form>
+    <a href="/">← 回首頁</a>
+</main>
+<script>
+    (function() {
+        const logoutForm = document.getElementById('admin-auto-logout');
+        if (!logoutForm) return;
+
+        const INACTIVITY_LIMIT = 10 * 60 * 1000;
+        const HEARTBEAT_INTERVAL = 60 * 1000;
+        const events = ['click', 'mousemove', 'keydown', 'scroll', 'touchstart', 'touchmove'];
+        let triggered = false;
+        let lastHeartbeat = Date.now();
+        let timer = setTimeout(triggerLogout, INACTIVITY_LIMIT);
+
+        function resetTimer() {
+            if (triggered) return;
+            clearTimeout(timer);
+            timer = setTimeout(triggerLogout, INACTIVITY_LIMIT);
+            sendHeartbeat();
+        }
+
+        function triggerLogout() {
+            if (triggered) return;
+            triggered = true;
+            logoutForm.submit();
+        }
+
+        function sendHeartbeat() {
+            const now = Date.now();
+            if (now - lastHeartbeat < HEARTBEAT_INTERVAL) {
+                return;
+            }
+            lastHeartbeat = now;
+            if (navigator.sendBeacon) {
+                try {
+                    navigator.sendBeacon('/admin/activity', new Blob([], { type: 'text/plain' }));
+                    return;
+                } catch (err) {
+                    // ignore
+                }
+            }
+            fetch('/admin/activity', { method: 'POST', keepalive: true }).catch(function() {});
+        }
+
+        events.forEach(function(evt) {
+            document.addEventListener(evt, resetTimer, { passive: true });
+        });
+
+        sendHeartbeat();
+    })();
+</script>
+</body>
+</html>

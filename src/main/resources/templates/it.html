@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${title}">IT 控制台</title>
+    <style>
+        body { font-family: "Noto Sans TC", "Segoe UI", Arial, sans-serif; margin: 0; background: #0e1725; color: #f4f6ff; }
+        header { padding: 30px 44px; background: linear-gradient(135deg, #21324f, #17243b); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); }
+        h1 { margin: 0; font-size: 26px; }
+        main { padding: 36px 44px; display: grid; gap: 20px; }
+        section { background: rgba(22, 32, 56, 0.75); border-radius: 16px; padding: 22px; border: 1px solid rgba(255, 255, 255, 0.08); }
+        .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+        .status-card { background: rgba(9, 15, 28, 0.65); padding: 18px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
+        .status-card h3 { margin: 0 0 6px 0; font-size: 15px; color: #8fb9ff; }
+        .status-card p { margin: 0; font-size: 26px; font-weight: 600; }
+        .log-view { background: rgba(0,0,0,0.35); padding: 16px; border-radius: 10px; font-family: "Fira Code", "Consolas", monospace; font-size: 13px; line-height: 1.6; color: #d3e0ff; max-height: 220px; overflow: auto; }
+        button { background: #2f89ff; color: #fff; border: none; padding: 10px 24px; border-radius: 20px; cursor: pointer; margin-top: 12px; }
+        button:hover { background: #4c9aff; }
+        a { color: #8ec7ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+<header>
+    <h1 th:text="${title}">很好睡電影院 IT 控制台</h1>
+    <p th:text="${message}">監控系統健康狀態與維護排程。</p>
+</header>
+<main>
+    <section>
+        <h2>系統健康指標</h2>
+        <div class="status-grid">
+            <div class="status-card">
+                <h3>API 可用率</h3>
+                <p>99.97%</p>
+            </div>
+            <div class="status-card">
+                <h3>平均回應時間</h3>
+                <p>182 ms</p>
+            </div>
+            <div class="status-card">
+                <h3>錯誤率</h3>
+                <p>0.12%</p>
+            </div>
+        </div>
+        <button type="button">觸發健康檢查</button>
+    </section>
+    <section>
+        <h2>最近部署與維護</h2>
+        <ul>
+            <li>2025-10-10 02:00　票務後台補丁 v1.4.8 完成</li>
+            <li>2025-10-09 23:10　網路設備更新完成</li>
+            <li>2025-10-08 01:30　報表服務擴充節點</li>
+        </ul>
+    </section>
+    <section>
+        <h2>系統日誌摘錄</h2>
+        <div class="log-view">
+            [2025-10-11 11:42:18] INFO  SeatService - Rebalanced seat allocation cache.<br>
+            [2025-10-11 11:40:03] WARN  PaymentGateway - Latency spike detected (432ms).<br>
+            [2025-10-11 11:37:54] INFO  Scheduler - Nightly report job queued.<br>
+            [2025-10-11 11:35:02] INFO  SecurityAudit - Admin role review completed without anomalies.<br>
+        </div>
+    </section>
+    <form method="post" action="/logout">
+        <button type="submit">登出 IT 帳號</button>
+    </form>
+    <form id="it-auto-logout" method="post" action="/logout" style="display: none;"></form>
+    <a href="/">← 回首頁</a>
+</main>
+<script>
+    (function() {
+        const logoutForm = document.getElementById('it-auto-logout');
+        if (!logoutForm) return;
+
+        const INACTIVITY_LIMIT = 10 * 60 * 1000;
+        const HEARTBEAT_INTERVAL = 60 * 1000;
+        const events = ['click', 'mousemove', 'keydown', 'scroll', 'touchstart', 'touchmove'];
+        let triggered = false;
+        let lastHeartbeat = Date.now();
+        let timer = setTimeout(triggerLogout, INACTIVITY_LIMIT);
+
+        function resetTimer() {
+            if (triggered) return;
+            clearTimeout(timer);
+            timer = setTimeout(triggerLogout, INACTIVITY_LIMIT);
+            sendHeartbeat();
+        }
+
+        function triggerLogout() {
+            if (triggered) return;
+            triggered = true;
+            logoutForm.submit();
+        }
+
+        function sendHeartbeat() {
+            const now = Date.now();
+            if (now - lastHeartbeat < HEARTBEAT_INTERVAL) {
+                return;
+            }
+            lastHeartbeat = now;
+            if (navigator.sendBeacon) {
+                try {
+                    navigator.sendBeacon('/it/activity', new Blob([], { type: 'text/plain' }));
+                    return;
+                } catch (err) {
+                    // ignore
+                }
+            }
+            fetch('/it/activity', { method: 'POST', keepalive: true }).catch(function() {});
+        }
+
+        events.forEach(function(evt) {
+            document.addEventListener(evt, resetTimer, { passive: true });
+        });
+
+        sendHeartbeat();
+    })();
+</script>
+</body>
+</html>

@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.example.cinema.dao.UserDao;
 import com.example.cinema.model.User;
+import com.example.cinema.model.User.UserType;
 
 @Service
 public class UserService {
@@ -29,13 +30,20 @@ public class UserService {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public Long registerUser(String username, String rawPassword, boolean asAdmin) {
+    public Long registerUser(String username, String rawPassword, UserType userType, boolean asAdmin) {
         String hash = passwordEncoder.encode(rawPassword);
-        Long userId = userDao.createUser(username, hash);
+        Long userId = userDao.createUser(username, hash, userType);
         userDao.assignRole(userId, "ROLE_USER");
         if (asAdmin) {
             userDao.assignRole(userId, "ROLE_ADMIN");
         }
+        return userId;
+    }
+
+    public Long registerEmployee(String username, String rawPassword) {
+        String hash = passwordEncoder.encode(rawPassword);
+        Long userId = userDao.createUser(username, hash, UserType.EMPLOYEE);
+        userDao.assignRole(userId, "ROLE_EMPLOYEE");
         return userId;
     }
 
@@ -61,8 +69,7 @@ public class UserService {
             existing = new HashSet<>(jdbcTemplate.queryForList(
                     "SELECT movie_id FROM user_watchlist WHERE user_id = ?",
                     Long.class,
-                    user.getId()
-            ));
+                    user.getId()));
         } catch (DataAccessException ex) {
             existing = new HashSet<>();
         }
@@ -73,10 +80,8 @@ public class UserService {
                     jdbcTemplate.update(
                             "INSERT INTO user_watchlist (user_id, movie_id) VALUES (?, ?)",
                             user.getId(),
-                            movieId
-                    );
+                            movieId);
                 } catch (DataAccessException ignore) {
-                    // Swallow exception to avoid breaking login flow when watchlist persistence is unavailable
                 }
             }
         }
@@ -98,19 +103,16 @@ public class UserService {
             roleId = jdbcTemplate.queryForObject(
                     "SELECT id FROM roles WHERE code = ?",
                     Long.class,
-                    "ROLE_CUSTOMER"
-            );
+                    "ROLE_USER");
         } catch (EmptyResultDataAccessException ex) {
             jdbcTemplate.update(
                     "INSERT INTO roles (code, name) VALUES (?, ?)",
-                    "ROLE_CUSTOMER",
-                    "Customer"
-            );
+                    "ROLE_USER",
+                    "一般使用者");
             roleId = jdbcTemplate.queryForObject(
                     "SELECT id FROM roles WHERE code = ?",
                     Long.class,
-                    "ROLE_CUSTOMER"
-            );
+                    "ROLE_USER");
         } catch (DataAccessException ex) {
             return;
         }
@@ -119,10 +121,8 @@ public class UserService {
             jdbcTemplate.update(
                     "INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)",
                     user.getId(),
-                    roleId
-            );
+                    roleId);
         } catch (DataAccessException ignore) {
-            // if role assignment fails we simply skip to keep authentication flow alive
         }
     }
 }

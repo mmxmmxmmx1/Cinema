@@ -37,24 +37,14 @@ public class PageController {
         this.sessionService = sessionService;
     }
 
-    @GetMapping({"/member/login", "/member/login/"})
+    @GetMapping({ "/member/login", "/member/login/" })
     public String memberLoginPage(@RequestParam(value = "error", required = false) String error,
-                                  HttpSession session,
-                                  Model model) {
+            HttpSession session,
+            Model model) {
         if (hasActiveSession(session, Realm.MEMBER)) {
-            sessionService.updateLastActivity(session, Realm.MEMBER);
             return "redirect:/member";
         }
-
-        Duration lockRemaining = sessionService.remainingLockDuration(session, Realm.MEMBER);
-        if (lockRemaining.compareTo(Duration.ZERO) > 0) {
-            applyLockMessage(model, lockRemaining);
-        } else if (error != null) {
-            String message = sessionService.consumeErrorMessage(session, Realm.MEMBER);
-            model.addAttribute("error", message != null ? message : "帳號或密碼不正確，請再試一次。");
-        }
-
-        return "member-login";
+        return renderLoginView("member-login", Realm.MEMBER, error, session, model);
     }
 
     @GetMapping("/member")
@@ -69,29 +59,13 @@ public class PageController {
         return "member";
     }
 
-    @PostMapping("/member/logout")
-    public String handleMemberLogout(HttpSession session) {
-        sessionService.clearAuthentication(session, Realm.MEMBER);
-        sessionService.resetAttempts(session, Realm.MEMBER);
-        return "redirect:/";
-    }
-
-    @GetMapping({"/employee/login", "/employee/login/"})
+    @GetMapping({ "/employee/login", "/employee/login/" })
     public String employeeLoginPage(@RequestParam(value = "error", required = false) String error,
-                                    HttpSession session, Model model) {
+            HttpSession session, Model model) {
         if (hasActiveSession(session, Realm.EMPLOYEE)) {
-            sessionService.updateLastActivity(session, Realm.EMPLOYEE);
             return "redirect:/employee";
         }
-
-        Duration lockRemaining = sessionService.remainingLockDuration(session, Realm.EMPLOYEE);
-        if (lockRemaining.compareTo(Duration.ZERO) > 0) {
-            applyLockMessage(model, lockRemaining);
-        } else if (error != null) {
-            String message = sessionService.consumeErrorMessage(session, Realm.EMPLOYEE);
-            model.addAttribute("error", message != null ? message : "帳號或密碼不正確，請再試一次。");
-        }
-        return "employee-login";
+        return renderLoginView("employee-login", Realm.EMPLOYEE, error, session, model);
     }
 
     @GetMapping("/employee")
@@ -104,14 +78,15 @@ public class PageController {
         sessionService.updateLastActivity(session, Realm.EMPLOYEE);
 
         model.addAttribute("title", "很好睡電影院員工後台");
-        model.addAttribute("message", "掌握每日待辦與營運狀況，協助團隊順利進行。");
+        model.addAttribute("message", "掌握每日待辦與座位銷售狀況,協助影城營運。");
 
         List<ShowtimeSummary> summaries = new ArrayList<>();
         List<Movie> movies = movieService.getMovies();
 
         for (Movie movie : movies) {
             for (Showtime showtime : movie.getShowtimes()) {
-                SeatLayout seatLayout = movieService.getShowtimeDetails(movie.getId(), showtime.getId()).getSeatLayout();
+                SeatLayout seatLayout = movieService.getShowtimeDetails(movie.getId(), showtime.getId())
+                        .getSeatLayout();
                 long soldSeats = seatLayout.getSeats().stream().filter(SeatStatus::isReserved).count();
                 int totalSeats = seatLayout.getRows() * seatLayout.getColumns();
                 int percentage = totalSeats > 0 ? (int) (soldSeats * 100 / totalSeats) : 0;
@@ -122,8 +97,7 @@ public class PageController {
                         showtime.getAuditorium(),
                         (int) soldSeats,
                         totalSeats,
-                        percentage
-                ));
+                        percentage));
             }
         }
         model.addAttribute("showtimeSummaries", summaries);
@@ -160,6 +134,18 @@ public class PageController {
         return true;
     }
 
+    private String renderLoginView(String viewName, Realm realm, String error, HttpSession session, Model model) {
+        Duration lockRemaining = sessionService.remainingLockDuration(session, realm);
+        if (lockRemaining.compareTo(Duration.ZERO) > 0) {
+            applyLockMessage(model, lockRemaining);
+        } else if (error != null) {
+            String message = sessionService.consumeErrorMessage(session, realm);
+            model.addAttribute("error", message != null ? message : "帳號或密碼不正確,請再試一次。");
+        }
+
+        return viewName;
+    }
+
     private void populateMemberModel(Model model) {
         model.addAttribute("title", "很好睡電影院會員專區");
         model.addAttribute("message", "歡迎回來！立即查看個人優惠與專屬影城體驗。");
@@ -169,7 +155,7 @@ public class PageController {
         Duration positive = duration.isNegative() ? Duration.ZERO : duration;
         long seconds = Math.max(1, positive.getSeconds());
         long minutes = Math.max(1, (seconds + 59) / 60);
-        model.addAttribute("error", "帳號嘗試次數過多，已被暫時鎖定。請於 " + minutes + " 分鐘後再試。");
+        model.addAttribute("error", "帳號嘗試次數過多,已被暫時鎖定。請於 " + minutes + " 分鐘後再試。");
         model.addAttribute("lockSeconds", seconds);
     }
 }

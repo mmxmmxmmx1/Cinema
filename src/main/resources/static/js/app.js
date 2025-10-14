@@ -1,18 +1,15 @@
 const { createApp } = Vue;
 const { createRouter, createWebHistory } = VueRouter;
 
-// 載入中組件
 const LoadingState = {
   template: '<div class="loading">載入中...</div>'
 };
 
-// 錯誤狀態組件
 const ErrorState = {
   template: '<div class="error-state">{{ message }}</div>',
   props: ['message']
 };
 
-// Hero 標題組件
 const Hero = {
   template: `
     <header class="hero">
@@ -21,24 +18,32 @@ const Hero = {
         <img class="hero-badge" src="/images/sleep.jpg" alt="Very Sleepy Cinema 徽章">
         <div class="hero-text">
           <h1>很好睡電影院</h1>
-          <p>每個顧客都可以睡得很安穩</p>
+          <p>每個顧客都可以睡得很安穩。</p>
         </div>
       </div>
     </header>
   `
 };
 
-// 浮動按鈕組件
 const GlobalFloatingButtons = {
   template: `
     <div>
+      <!--
+        Route the login buttons directly to the appropriate login endpoints.
+        The previous implementation forwarded '/login?target=member' and
+        '/login?target=employee' through a generic '/login' handler, but that
+        path was configured to forward back to the SPA index page.  As a
+        result, clicking these links never displayed the actual login pages.
+        Here we point directly to the dedicated Spring MVC login pages
+        implemented in PageController, avoiding any intermediate query
+        parameters or view controller forwarding.
+      -->
       <a class="floating-button login" href="/member/login">會員登入</a>
       <a class="floating-button employee" href="/employee/login">員工專區</a>
     </div>
   `
 };
 
-// 首頁組件 - 電影列表
 const HomePage = {
   template: `
     <div class="app-shell">
@@ -51,7 +56,7 @@ const HomePage = {
           <div class="card-body">
             <h3>{{ movie.title }}</h3>
             <p>{{ movie.subtitle }}</p>
-            <router-link class="primary-link" :to="'/movies/' + movie.id">查看場次</router-link>
+            <router-link class="primary-link" :to="'/movies/' + movie.id">查閱場次</router-link>
           </div>
         </article>
       </section>
@@ -80,30 +85,29 @@ const HomePage = {
       this.movies = await response.json();
       this.loading = false;
     } catch (err) {
-      this.error = err.message;
+      this.error = err.message || '發生未知錯誤。';
       this.loading = false;
     }
   }
 };
 
-// 電影詳情頁組件
 const MovieDetailPage = {
   template: `
     <div class="app-shell">
       <div class="page">
         <LoadingState v-if="loading" />
         <template v-else-if="error || !movie">
-          <ErrorState :message="error || '找不到電影資料。'" />
+          <ErrorState :message="error || '找不到指定電影。'" />
           <button class="primary-link" @click="goBack">返回上一頁</button>
         </template>
         <template v-else>
-          <button class="back-link" @click="goBack">← 返回</button>
+          <button class="back-link" @click="goBack">返回</button>
           <div class="movie-detail-card">
             <img :src="movie.posterUrl" :alt="movie.title" />
             <div>
               <h2>{{ movie.title }}</h2>
               <p>{{ movie.description }}</p>
-              <h3>查看場次</h3>
+              <h3>場次資訊</h3>
               <ul class="showtime-list">
                 <li v-for="showtime in movie.showtimes" :key="showtime.id" class="showtime-item">
                   <div class="showtime-meta">
@@ -111,9 +115,10 @@ const MovieDetailPage = {
                     <span>{{ showtime.durationMinutes }} 分鐘</span>
                     <span>{{ showtime.auditorium }}</span>
                   </div>
-                  <router-link class="primary-link" :to="'/movies/' + movie.id + '/showtimes/' + showtime.id">
-                    選擇座位
-                  </router-link>
+                    <router-link class="primary-link"
+                      :to="'/movies/' + movie.id + '/showtimes/' + showtime.id">
+                      選擇座位
+                    </router-link>
                 </li>
               </ul>
             </div>
@@ -134,38 +139,25 @@ const MovieDetailPage = {
     };
   },
   async mounted() {
-    await this.loadMovie();
-  },
-  watch: {
-    '$route.params.movieId': {
-      handler() {
-        this.loadMovie();
+    try {
+      const response = await fetch(`/api/movies/${this.$route.params.movieId}`);
+      if (!response.ok) {
+        throw new Error('無法載入電影詳細資料。');
       }
+      this.movie = await response.json();
+      this.loading = false;
+    } catch (err) {
+      this.error = err.message || '讀取電影內容時發生錯誤。';
+      this.loading = false;
     }
   },
   methods: {
-    async loadMovie() {
-      this.loading = true;
-      this.error = null;
-      try {
-        const response = await fetch(`/api/movies/${this.$route.params.movieId}`);
-        if (!response.ok) {
-          throw new Error('找不到電影。');
-        }
-        this.movie = await response.json();
-        this.loading = false;
-      } catch (err) {
-        this.error = err.message;
-        this.loading = false;
-      }
-    },
     goBack() {
       this.$router.go(-1);
     }
   }
 };
 
-// 座位選擇頁組件
 const SeatSelectionPage = {
   template: `
     <div class="app-shell">
@@ -176,18 +168,17 @@ const SeatSelectionPage = {
           <button class="primary-link" @click="goBack">返回上一頁</button>
         </template>
         <template v-else>
-          <button class="back-link" @click="goBack">← 返回</button>
-          <div class="seat-layout">
-            <div>
-              <h2>{{ movie.title }}</h2>
-              <p>{{ details.showtime.startTime }} | {{ details.showtime.durationMinutes }} 分鐘 | {{ details.showtime.auditorium }}</p>
+          <button class="back-link" @click="goBack">返回</button>
+          <div class="seat-selection">
+            <div class="movie-detail-card">
+              <img :src="movie.posterUrl" :alt="movie.title" />
+              <div>
+                <h2>{{ movie.title }}</h2>
+                <p>{{ details.showtime.startTime }} · {{ details.showtime.auditorium }}</p>
+                <p>{{ details.showtime.durationMinutes }} 分鐘</p>
+              </div>
             </div>
-            <div class="seat-legend">
-              <span><span class="legend-box legend-available"></span> 可選座位</span>
-              <span><span class="legend-box legend-selected"></span> 已選座位</span>
-              <span><span class="legend-box legend-reserved"></span> 已預留座位</span>
-            </div>
-            <div class="seat-grid">
+            <div class="seat-grid" role="grid">
               <div v-for="(row, rowIndex) in seatRows" :key="rowIndex" class="seat-row">
                 <span class="row-label">{{ String.fromCharCode(65 + rowIndex) }}</span>
                 <div class="seat-row-grid">
@@ -205,7 +196,8 @@ const SeatSelectionPage = {
             </div>
             <div class="selection-summary">
               <div>
-                <strong>已選座位：</strong> {{ selectedSeats.length > 0 ? selectedSeats.join(', ') : '尚未選擇' }}
+                <strong>已選座位：</strong>
+                {{ selectedSeats.length > 0 ? selectedSeats.join(', ') : '尚未選擇' }}
               </div>
               <button type="button" :disabled="selectedSeats.length === 0">
                 確認訂票
@@ -255,17 +247,17 @@ const SeatSelectionPage = {
         ]);
 
         if (!movieRes.ok) {
-          throw new Error('找不到電影。');
+          throw new Error('無法載入電影資訊。');
         }
         if (!showtimeRes.ok) {
-          throw new Error('找不到場次資訊。');
+          throw new Error('無法載入場次資料。');
         }
 
         this.movie = await movieRes.json();
         this.details = await showtimeRes.json();
         this.loading = false;
       } catch (err) {
-        this.error = err.message;
+        this.error = err.message || '讀取座位配置時發生錯誤。';
         this.loading = false;
       }
     },
@@ -296,7 +288,6 @@ const SeatSelectionPage = {
   }
 };
 
-// 路由配置
 const routes = [
   { path: '/', component: HomePage },
   { path: '/movies/:movieId', component: MovieDetailPage },
@@ -309,7 +300,6 @@ const router = createRouter({
   routes
 });
 
-// 建立並掛載 Vue 應用程式
 const app = createApp({
   template: '<router-view></router-view>'
 });
