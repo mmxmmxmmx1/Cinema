@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-@Component
+// @Component  // ← 注释掉此行：禁用此监听器
 public class AuthenticationAttemptListener {
 
     private final LoginAttemptService loginAttemptService;
@@ -21,7 +21,7 @@ public class AuthenticationAttemptListener {
         this.loginAttemptService = loginAttemptService;
     }
 
-    @EventListener
+    // @EventListener // ← 注释掉此行
     public void onAuthenticationSuccess(AuthenticationSuccessEvent event) {
         HttpServletRequest request = currentRequest();
         SessionService.Realm realm = resolveRealm(request);
@@ -30,7 +30,7 @@ public class AuthenticationAttemptListener {
         }
     }
 
-    @EventListener
+    // @EventListener // ← 注释掉此行
     public void onAuthenticationFailure(AbstractAuthenticationFailureEvent event) {
         HttpServletRequest request = currentRequest();
         SessionService.Realm realm = resolveRealm(request);
@@ -39,22 +39,18 @@ public class AuthenticationAttemptListener {
         }
     }
 
-    private SessionService.Realm resolveRealm(HttpServletRequest request) {
-        if (request == null) {
-            return null;
-        }
-        String path = request.getRequestURI();
-        if (path.startsWith("/employee")) {
-            return SessionService.Realm.EMPLOYEE;
-        }
-        if (path.startsWith("/member")) {
-            return SessionService.Realm.MEMBER;
-        }
-        return null;
+    private HttpServletRequest currentRequest() {
+        return ((ServletRequestAttributes) RequestContextHolder.currentRequestAttributes()).getRequest();
     }
 
-    private HttpServletRequest currentRequest() {
-        ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-        return attributes == null ? null : attributes.getRequest();
+    private SessionService.Realm resolveRealm(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        if (uri.startsWith("/member")) {
+            return SessionService.Realm.MEMBER;
+        }
+        if (uri.startsWith("/employee")) {
+            return SessionService.Realm.EMPLOYEE;
+        }
+        return null;
     }
 }

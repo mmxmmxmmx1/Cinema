@@ -85,16 +85,22 @@ public class SessionService {
 
     public void applyFailureFeedback(HttpSession session, Realm realm, LoginAttemptService.LoginAttemptStatus status) {
         Keys keys = keys(realm);
-        int attemptsUsed = LoginAttemptService.MAX_ATTEMPTS - status.remainingAttempts();
-        session.setAttribute(keys.attemptCountKey, Math.max(0, attemptsUsed));
-        if (status.lockDuration().compareTo(Duration.ZERO) > 0) {
+
+        if (status.locked()) {
+            session.removeAttribute(keys.attemptCountKey);
             Instant lockUntil = Instant.now().plus(status.lockDuration());
             session.setAttribute(keys.lockUntilKey, lockUntil);
             session.setAttribute(keys.errorMessageKey, formatLockMessage(status.lockDuration()));
-        } else if (status.remainingAttempts() > 0) {
-            session.setAttribute(keys.errorMessageKey, formatRemainingAttempts(status.remainingAttempts()));
         } else {
-            session.setAttribute(keys.errorMessageKey, "帳號或密碼不正確");
+            int attemptsUsed = LoginAttemptService.MAX_ATTEMPTS - status.remainingAttempts();
+            session.setAttribute(keys.attemptCountKey, attemptsUsed);
+            session.removeAttribute(keys.lockUntilKey);
+
+            if (status.remainingAttempts() > 0) {
+                session.setAttribute(keys.errorMessageKey, formatRemainingAttempts(status.remainingAttempts()));
+            } else {
+                session.setAttribute(keys.errorMessageKey, "帳號或密碼不正確");
+            }
         }
     }
 

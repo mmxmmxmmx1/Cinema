@@ -26,6 +26,9 @@ import com.example.cinema.service.UserService;
 
 import jakarta.servlet.http.HttpSession;
 
+/**
+ * Spring Security 設定。定義各角色的登入、登出流程與密碼編碼器。
+ */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -45,17 +48,22 @@ public class SecurityConfig {
         this.userServiceProvider = userServiceProvider;
     }
 
+    /**
+     * 密碼編碼器，使用 Spring 預設的 DelegatingPasswordEncoder。
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
     }
 
+    /**
+     * 提供自訂的 UserDetailsService，從資料庫讀取使用者資料與角色。
+     */
     @Bean
     public UserDetailsService userDetailsService() {
         return username -> {
             User user = userDao.findByUsername(username)
                     .orElseThrow(() -> new UsernameNotFoundException("User not found with username: " + username));
-
             return new org.springframework.security.core.userdetails.User(
                     user.getUsername(),
                     user.getPassword(),
@@ -65,6 +73,9 @@ public class SecurityConfig {
         };
     }
 
+    /**
+     * 員工後台的安全過濾鏈。限制 URL、定義登入流程及失敗/成功處理邏輯。
+     */
     @Bean
     @Order(1)
     public SecurityFilterChain employeeSecurityFilterChain(HttpSecurity http) throws Exception {
@@ -79,7 +90,14 @@ public class SecurityConfig {
                         .loginProcessingUrl("/employee/login")
                         .failureHandler((request, response, exception) -> {
                             String username = request.getParameter("username");
-                            var status = loginAttemptService.getStatus(SessionService.Realm.EMPLOYEE, username);
+                            // 判斷該帳號是否存在於資料庫，若不存在則使用固定的 invalid key
+                            boolean exists = false;
+                            if (username != null && !username.isBlank()) {
+                                exists = userDao.findByUsername(username.trim()).isPresent();
+                            }
+                            // 將不存在的使用者全部歸為同一個 key，避免嘗試不同帳號繞過限制
+                            String attemptKey = exists ? username : "_invalid@ip";
+                            var status = loginAttemptService.registerFailure(SessionService.Realm.EMPLOYEE, attemptKey);
                             HttpSession session = request.getSession(true);
                             sessionService.applyFailureFeedback(session, SessionService.Realm.EMPLOYEE, status);
                             response.sendRedirect("/employee/login?error");
@@ -87,11 +105,9 @@ public class SecurityConfig {
                         .successHandler((request, response, authentication) -> {
                             String username = authentication.getName();
                             HttpSession session = request.getSession(true);
-
                             loginAttemptService.registerSuccess(SessionService.Realm.EMPLOYEE, username);
                             sessionService.establishSession(session, SessionService.Realm.EMPLOYEE);
                             sessionService.resetAttempts(session, SessionService.Realm.EMPLOYEE);
-
                             response.sendRedirect("/employee");
                         }))
                 .logout(logout -> logout
@@ -105,10 +121,12 @@ public class SecurityConfig {
                             response.sendRedirect("/employee/login");
                         })
                         .permitAll());
-
         return http.build();
     }
 
+    /**
+     * 會員專區的安全過濾鏈。限制 URL、定義登入流程及失敗/成功處理邏輯。
+     */
     @Bean
     @Order(2)
     public SecurityFilterChain memberSecurityFilterChain(HttpSecurity http) throws Exception {
@@ -123,7 +141,14 @@ public class SecurityConfig {
                         .loginProcessingUrl("/member/login")
                         .failureHandler((request, response, exception) -> {
                             String username = request.getParameter("username");
-                            var status = loginAttemptService.getStatus(SessionService.Realm.MEMBER, username);
+                            // 判斷該帳號是否存在於資料庫，若不存在則使用固定的 invalid key
+                            boolean exists = false;
+                            if (username != null && !username.isBlank()) {
+                                exists = userDao.findByUsername(username.trim()).isPresent();
+                            }
+                            // 將不存在的使用者全部歸為同一個 key，避免嘗試不同帳號繞過限制
+                            String attemptKey = exists ? username : "_invalid@ip";
+                            var status = loginAttemptService.registerFailure(SessionService.Realm.MEMBER, attemptKey);
                             HttpSession session = request.getSession(true);
                             sessionService.applyFailureFeedback(session, SessionService.Realm.MEMBER, status);
                             response.sendRedirect("/member/login?error");
@@ -131,13 +156,10 @@ public class SecurityConfig {
                         .successHandler((request, response, authentication) -> {
                             String username = authentication.getName();
                             HttpSession session = request.getSession(true);
-
                             loginAttemptService.registerSuccess(SessionService.Realm.MEMBER, username);
                             sessionService.establishSession(session, SessionService.Realm.MEMBER);
                             sessionService.resetAttempts(session, SessionService.Realm.MEMBER);
-
                             handleMemberPostLogin(session, authentication);
-
                             response.sendRedirect("/member");
                         }))
                 .logout(logout -> logout
@@ -151,10 +173,12 @@ public class SecurityConfig {
                             response.sendRedirect("/member/login");
                         })
                         .permitAll());
-
         return http.build();
     }
 
+    /**
+     * 其他路徑的預設安全過濾鏈。放行靜態資源與公開 API。
+     */
     @Bean
     @Order(3)
     public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
@@ -166,32 +190,37 @@ public class SecurityConfig {
                 .requestMatchers("/api/guest/**", "/api/movies/**").permitAll()
                 .anyRequest().authenticated())
                 .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**", "/api/guest/**"));
-
         return http.build();
     }
 
+    /**
+     * 登入成功後，處理會員相關邏輯，例如合併訪客片單。
+     */
     private void handleMemberPostLogin(HttpSession session, Authentication authentication) {
         UserService userService = userServiceProvider.getIfAvailable();
-        if (userService == null)
+        if (userService == null) {
             return;
-
+        }
         if (!hasAuthority(authentication.getAuthorities(), "ROLE_USER")) {
             return;
         }
-
         @SuppressWarnings("unchecked")
         Set<Long> watchlist = (Set<Long>) session.getAttribute(sessionService.guestWatchlistKey());
         if (watchlist != null && !watchlist.isEmpty()) {
             userService.mergeGuestWatchlistIntoUser(authentication.getName(), watchlist);
             session.removeAttribute(sessionService.guestWatchlistKey());
         }
-
         userService.ensureBasicRole(authentication.getName());
     }
 
+    /**
+     * 檢查登入者是否包含指定權限。
+     */
     private boolean hasAuthority(java.util.Collection<? extends GrantedAuthority> authorities, String code) {
-        if (authorities == null)
+        if (authorities == null) {
             return false;
-        return authorities.stream().anyMatch(granted -> code.equalsIgnoreCase(granted.getAuthority()));
+        }
+        return authorities.stream()
+                .anyMatch(granted -> code.equalsIgnoreCase(granted.getAuthority()));
     }
 }

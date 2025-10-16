@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
@@ -21,7 +21,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 
 <style>
-/* 啟動畫面主容器 */
+/* ???恍銝餃捆??*/
 #splash-screen {
   position: fixed;
   top: 0;
@@ -38,19 +38,19 @@
   transition: opacity 0.8s ease, visibility 0.8s ease;
 }
 
-/* 啟動畫面淡出效果 */
+/* ???恍瘛∪?? */
 #splash-screen.fade-out {
   opacity: 0;
   visibility: hidden;
 }
 
-/* 內容容器 */
+/* ?批捆摰孵 */
 .splash-content {
   text-align: center;
   animation: fadeInUp 1.2s ease-out;
 }
 
-/* 電影院名稱 */
+/* ?餃蔣?Ｗ?蝔?*/
 .cinema-title {
   font-size: 3.5rem;
   color: #fff;
@@ -61,7 +61,7 @@
   font-family: 'Noto Sans TC', sans-serif;
 }
 
-/* 標語 */
+/* 璅? */
 .tagline {
   font-size: 1.2rem;
   color: #b8b8b8;
@@ -70,12 +70,12 @@
   font-family: 'Noto Sans TC', sans-serif;
 }
 
-/* 載入動畫容器 */
+/* 頛?摰孵 */
 .spinner-wrapper {
   margin: 2rem auto;
 }
 
-/* 旋轉載入圖示 */
+/* ??頛?內 */
 .spinner {
   width: 50px;
   height: 50px;
@@ -86,13 +86,13 @@
   margin: 0 auto;
 }
 
-/* 關鍵幀動畫：旋轉 */
+/* ?撟?嚗?頧?*/
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
 
-/* 關鍵幀動畫：淡入向上 */
+/* ?撟?嚗楚?亙?銝?*/
 @keyframes fadeInUp {
   0% {
     opacity: 0;
@@ -104,13 +104,13 @@
   }
 }
 
-/* 關鍵幀動畫：淡入 */
+/* ?撟?嚗楚??*/
 @keyframes fadeIn {
   0% { opacity: 0; }
   100% { opacity: 1; }
 }
 
-/* 關鍵幀動畫：發光效果 */
+/* ?撟?嚗????*/
 @keyframes titleGlow {
   0% {
     text-shadow: 0 0 10px rgba(255, 255, 255, 0.3),
@@ -123,7 +123,7 @@
   }
 }
 
-/* 主內容初始隱藏 */
+/* 銝餃摰孵?憪??*/
 #root {
   opacity: 0;
   transition: opacity 0.6s ease-in;
@@ -133,7 +133,7 @@
   opacity: 1;
 }
 
-/* 響應式設計 */
+/* ?踵?撘身閮?*/
 @media (max-width: 768px) {
   .cinema-title {
     font-size: 2.5rem;
@@ -158,7 +158,7 @@
 </head>
 <body>
   
-<!-- 啟動畫面（漸進式首頁） -->
+<!-- ???恍嚗撓?脣?擐?嚗?-->
 <div id="splash-screen">
   <div class="splash-content">
     <h1 class="cinema-title">很好睡電影院</h1>
@@ -169,38 +169,38 @@
   </div>
 </div>
 
-<!-- 主要應用內容 -->
+<!-- 銝餉???批捆 -->
 <div id="root"></div>
 
-<!-- Vue.js 和 Vue Router -->
+<!-- Vue.js ??Vue Router -->
 <script src="https://unpkg.com/vue@3.3.4/dist/vue.global.js"></script>
 <script src="https://unpkg.com/vue-router@4.2.4/dist/vue-router.global.js"></script>
 
-<!-- 啟動畫面控制腳本 -->
+<!-- ???恍?批?單 -->
 <script>
 (function(){
-  // 啟動畫面控制邏輯
+  // ???恍?批?摩
   document.addEventListener('DOMContentLoaded', function() {
     const splashScreen = document.getElementById('splash-screen');
     const appContent = document.getElementById('root');
     
-    // 設定啟動畫面顯示時間（2.5秒）
+    // 閮剖????恍憿舐內??嚗?.5蝘?
     setTimeout(function() {
-      // 添加淡出類別
+      // 瘛餃?瘛∪憿
       splashScreen.classList.add('fade-out');
       
-      // 等待淡出動畫完成後顯示主內容
+      // 蝑?瘛∪?摰?敺＊蝷箔蜓?批捆
       setTimeout(function() {
         splashScreen.style.display = 'none';
         appContent.classList.add('show');
-      }, 800); // 與CSS transition時間相同
+      }, 800); // ?SS transition???詨?
       
     }, 2500);
   });
 })();
 </script>
 
-<!-- 主要應用程式 -->
+<!-- 銝餉??蝔? -->
 <script src="/js/app.js"></script>
 
 </body>
