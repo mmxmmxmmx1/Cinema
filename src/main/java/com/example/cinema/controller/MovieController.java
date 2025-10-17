@@ -34,7 +34,8 @@ public class MovieController {
     }
 
     @GetMapping("/{movieId}/showtimes/{showtimeId}")
-    public ResponseEntity<ShowtimeDetails> getShowtimeDetails(@PathVariable String movieId, @PathVariable String showtimeId) {
+    public ResponseEntity<ShowtimeDetails> getShowtimeDetails(@PathVariable String movieId,
+            @PathVariable String showtimeId) {
         try {
             return ResponseEntity.ok(movieService.getShowtimeDetails(movieId, showtimeId));
         } catch (IllegalArgumentException ex) {

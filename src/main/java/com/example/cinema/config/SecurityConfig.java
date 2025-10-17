@@ -239,6 +239,7 @@ public class SecurityConfig {
                         "/webjars/**", "/assets/**")
                 .permitAll()
                 .requestMatchers("/api/guest/**", "/api/movies/**").permitAll()
+                .requestMatchers("/movies/**").permitAll() // 加這行
                 .anyRequest().authenticated())
                 .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**", "/api/guest/**"));
         return http.build();

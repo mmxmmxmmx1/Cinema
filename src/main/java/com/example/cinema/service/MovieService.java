@@ -25,15 +25,15 @@ public class MovieService {
 
     public MovieService() {
         List<Movie> seeds = List.of(
-                createMovie("mv-01", "沙丘:第二部", "", "images/dune-part-two.jpg",
+                createMovie("mv-01", "沙丘:第二部", "", "/images/dune-part-two.jpg",
                         "保羅亞崔迪與錢妮以及弗瑞曼人聯手,向毀滅他家族的陰謀者展開報復。",
                         showtimes("mv-01", 166, "09:30", "12:15", "15:00", "18:40", "21:25", "23:00")),
 
-                createMovie("mv-02", "奧本海默", "", "images/cinema1.png",
+                createMovie("mv-02", "奧本海默", "", "/images/cinema1.png",
                         "羅伯特奧本海默的一生,從他在原子彈研發中的角色,到他面臨的道德困境。",
                         showtimes("mv-02", 180, "08:50", "11:45", "14:30", "17:30", "20:40", "23:00")),
 
-                createMovie("mv-03", "蜘蛛人:穿越新宇宙", "", "images/spider-verse.jpg",
+                createMovie("mv-03", "蜘蛛人:穿越新宇宙", "", "/images/spider-verse.jpg",
                         "邁爾斯摩拉斯再次穿越多重宇宙,與其他蜘蛛人並肩作戰。",
                         showtimes("mv-03", 140, "10:20", "12:40", "15:20", "18:05", "21:10", "23:00")),
 
