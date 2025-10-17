@@ -1,0 +1,2 @@
+mysql.8 true true com.mysql.cj.jdbc.Driver
+jdbc:mysql://localhost:3306/hb-01-one-to-one-uni ProjectFileDir

@@ -1,0 +1,26 @@
+{ "lastFilter": { "state": "OPEN", "assignee": "mmxmmxmmx1" } } {
+"selectedUrlAndAccountId": { "url":
+"git@github.com:mmxmmxmmx1/Cinema.git", "accountId":
+"1509f1c3-168b-4144-bc1a-3ee03d969f58" } } { "customColor": "",
+"associatedIndex": 2 } { "keyToString": {
+"ModuleVcsDetector.initialDetectionPerformed": "true",
+"RequestMappingsPanelOrder0": "0", "RequestMappingsPanelOrder1": "1",
+"RequestMappingsPanelWidth0": "75", "RequestMappingsPanelWidth1": "75",
+"RunOnceActivity.OpenProjectViewOnStart": "true",
+"RunOnceActivity.ShowReadmeOnStart": "true",
+"RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252":
+"true", "RunOnceActivity.git.unshallow": "true",
+"SHARE_PROJECT_CONFIGURATION_FILES": "true", "Spring
+Boot.CinemaApplication.executor": "Run", "git-widget-placeholder":
+"master", "kotlin-language-version-configured": "true",
+"last_opened_file_path": "/home/mmx/桌面/JAVA 練習題",
+"node.js.detected.package.eslint": "true",
+"node.js.detected.package.tslint": "true",
+"node.js.selected.package.eslint": "(autodetect)",
+"node.js.selected.package.tslint": "(autodetect)",
+"nodejs_package_manager_path": "npm", "project.structure.last.edited":
+"Project", "project.structure.proportion": "0.0",
+"project.structure.side.proportion": "0.0",
+"vue.rearranger.settings.migration": "true" } }
+1759824751903 1759824751903
+    <servers />

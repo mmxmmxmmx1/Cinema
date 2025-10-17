@@ -23,84 +23,104 @@ public class UserDao {
     }
 
     public Optional<User> findByUsername(String username) {
-        String userSql = "SELECT * FROM users WHERE username = ?";
+        // 先從 members 表查詢
+        String memberSql = "SELECT * FROM members WHERE nickname = ?";
         try {
-            User user = jdbcTemplate.queryForObject(userSql, new UserMapper(), username);
+            User member = jdbcTemplate.queryForObject(memberSql, new MemberMapper(), username);
+            return Optional.ofNullable(member);
+        } catch (EmptyResultDataAccessException e) {
+            // 會員不存在，繼續查詢員工
+        }
 
-            String rolesSql = "SELECT r.id, r.code, r.name FROM roles r " +
-                    "JOIN user_roles ur ON r.id = ur.role_id " +
-                    "WHERE ur.user_id = ?";
-            List<Role> roles = jdbcTemplate.query(rolesSql, new RoleMapper(), user.getId());
-
-            User finalUser = new User(
-                    user.getId(),
-                    user.getUsername(),
-                    user.getFirstName(),
-                    user.getLastName(),
-                    user.getEmail(),
-                    user.getPhone(),
-                    user.getPassword(),
-                    user.getUserType(),
-                    user.getCreatedAt(),
-                    roles);
-            return Optional.of(finalUser);
-
+        // 從 employee 表查詢（JOIN roles 取得 level）
+        String employeeSql = "SELECT e.*, r.id as role_id, r.code as role_code, r.name as role_name, " +
+                "r.description as role_desc, r.level as role_level " +
+                "FROM employee e " +
+                "JOIN roles r ON e.role_id = r.id " +
+                "WHERE e.nickname = ?";
+        try {
+            User employee = jdbcTemplate.queryForObject(employeeSql, new EmployeeWithRoleMapper(), username);
+            return Optional.ofNullable(employee);
         } catch (EmptyResultDataAccessException e) {
             return Optional.empty();
         }
     }
 
-    private static class UserMapper implements RowMapper<User> {
+    private static class MemberMapper implements RowMapper<User> {
         @Override
         public User mapRow(ResultSet rs, int rowNum) throws SQLException {
-            String userTypeStr = rs.getString("user_type");
-            UserType userType = userTypeStr != null ? UserType.valueOf(userTypeStr) : UserType.CUSTOMER;
+            // 會員固定 CUSTOMER 角色
+            Role customerRole = new Role(1L, "CUSTOMER", "Customer", "Member customer", 1);
 
             return new User(
                     rs.getLong("id"),
-                    rs.getString("username"),
+                    rs.getString("nickname"),
                     rs.getString("first_name"),
                     rs.getString("last_name"),
                     rs.getString("email"),
                     rs.getString("phone"),
                     rs.getString("password"),
-                    userType,
+                    UserType.CUSTOMER,
                     rs.getTimestamp("created_at").toLocalDateTime(),
-                    null);
+                    List.of(customerRole) // 在建構子中傳入 roles
+            );
         }
     }
 
-    private static class RoleMapper implements RowMapper<Role> {
+    private static class EmployeeWithRoleMapper implements RowMapper<User> {
         @Override
-        public Role mapRow(ResultSet rs, int rowNum) throws SQLException {
-            return new Role(
+        public User mapRow(ResultSet rs, int rowNum) throws SQLException {
+            // 從查詢結果建立 Role
+            Role role = new Role(
+                    rs.getLong("role_id"),
+                    rs.getString("role_code"),
+                    rs.getString("role_name"),
+                    rs.getString("role_desc"),
+                    rs.getInt("role_level"));
+
+            return new User(
                     rs.getLong("id"),
-                    rs.getString("code"),
-                    rs.getString("name"));
+                    rs.getString("nickname"),
+                    rs.getString("first_name"),
+                    rs.getString("last_name"),
+                    rs.getString("email"),
+                    rs.getString("phone"),
+                    rs.getString("password"),
+                    UserType.EMPLOYEE,
+                    rs.getTimestamp("created_at").toLocalDateTime(),
+                    List.of(role) // 在建構子中傳入 roles
+            );
         }
     }
 
     public Long createUser(String username, String encodedPassword, UserType userType) {
-        jdbcTemplate.update(
-                "INSERT INTO users (username, password, user_type) VALUES (?, ?, ?)",
-                username, encodedPassword, userType.name());
-        return jdbcTemplate.queryForObject(
-                "SELECT id FROM users WHERE username = ?",
-                Long.class, username);
+        if (userType == UserType.CUSTOMER) {
+            // 插入會員
+            jdbcTemplate.update(
+                    "INSERT INTO members (nickname, password, first_name, last_name) VALUES (?, ?, '', '')",
+                    username, encodedPassword);
+            return jdbcTemplate.queryForObject(
+                    "SELECT id FROM members WHERE nickname = ?",
+                    Long.class, username);
+        } else {
+            // 插入員工（預設 role_id = 1, EMPLOYEE）
+            jdbcTemplate.update(
+                    "INSERT INTO employee (nickname, password, first_name, last_name, role_id) VALUES (?, ?, '', '', ?)",
+                    username, encodedPassword, 1L);
+            return jdbcTemplate.queryForObject(
+                    "SELECT id FROM employee WHERE nickname = ?",
+                    Long.class, username);
+        }
     }
 
     public void assignRole(Long userId, String roleCode) {
         Long roleId = jdbcTemplate.queryForObject(
                 "SELECT id FROM roles WHERE code = ?",
                 Long.class, roleCode);
-        jdbcTemplate.update(
-                "INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)",
-                userId, roleId);
-    }
 
-    public void updateUserType(Long userId, UserType userType) {
+        // 更新員工的 role_id
         jdbcTemplate.update(
-                "UPDATE users SET user_type = ? WHERE id = ?",
-                userType.name(), userId);
+                "UPDATE employee SET role_id = ? WHERE id = ?",
+                roleId, userId);
     }
 }
