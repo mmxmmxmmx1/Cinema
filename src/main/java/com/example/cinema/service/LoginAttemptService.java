@@ -4,10 +4,17 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+/**
+ * 登入嘗試服務，追蹤失敗的登入嘗試並實施帳號鎖定機制
+ */
 @Service
 public class LoginAttemptService {
+    private static final Logger logger = LoggerFactory.getLogger(LoginAttemptService.class);
 
     public static final int MAX_ATTEMPTS = 5;
     public static final Duration LOCK_DURATION = Duration.ofMinutes(10);
@@ -31,65 +38,59 @@ public class LoginAttemptService {
         return new LoginAttemptStatus(false, remaining, Duration.ZERO);
     }
 
+    /**
+     * 記錄登入失敗嘗試
+     * 
+     * @param realm 登入領域 (會員或員工)
+     * @param username 用戶名
+     * @return 登入嘗試狀態
+     */
     public LoginAttemptStatus registerFailure(SessionService.Realm realm, String username) {
         String key = key(realm, username);
+        logger.debug("記錄登入失敗 - 領域: {}, 用戶: {}", realm, username);
 
-        System.out.println("\n=== registerFailure START ===");
-        System.out.println("Realm: " + realm);
-        System.out.println("Username: " + username);
-        System.out.println("Key: " + key);
-
-        AttemptState state = attempts.get(key);
-        System.out.println("State exists before computeIfAbsent: " + (state != null));
-        if (state != null) {
-            System.out.println("failedAttempts BEFORE increment: " + state.failedAttempts);
-        }
-
-        state = attempts.computeIfAbsent(key, k -> {
-            System.out.println("Creating new AttemptState for key: " + k);
+        AttemptState state = attempts.computeIfAbsent(key, k -> {
+            logger.debug("為用戶 {} 創建新的嘗試狀態", username);
             return new AttemptState();
         });
 
-        // 检查帐户是否被锁定且锁定未过期
+        // 檢查帳戶是否被鎖定且鎖定未過期
         if (state.lockedUntil != null && state.lockedUntil.isAfter(Instant.now())) {
-            System.out.println("Account is LOCKED. Returning locked status.");
-            LoginAttemptStatus status = getStatus(key);
-            System.out.println("=== registerFailure END (LOCKED) ===\n");
-            return status;
+            logger.warn("帳戶已鎖定 - 領域: {}, 用戶: {}", realm, username);
+            return getStatus(key);
         }
 
-        // 如果锁定已过期，重置计数器和锁定时间
+        // 如果鎖定已過期，重置計數器和鎖定時間
         if (state.lockedUntil != null && !state.lockedUntil.isAfter(Instant.now())) {
-            System.out.println("Lock expired. Resetting failedAttempts and lockedUntil.");
+            logger.info("帳戶鎖定已過期，重置計數器 - 領域: {}, 用戶: {}", realm, username);
             state.failedAttempts = 0;
             state.lockedUntil = null;
         }
 
-        // 递增失败次数
+        // 遞增失敗次數
         state.failedAttempts++;
-        System.out.println("failedAttempts AFTER increment: " + state.failedAttempts);
-        System.out.println("MAX_ATTEMPTS: " + MAX_ATTEMPTS);
+        logger.debug("登入失敗次數: {}/{} - 領域: {}, 用戶: {}", state.failedAttempts, MAX_ATTEMPTS, realm, username);
 
         if (state.failedAttempts >= MAX_ATTEMPTS) {
             state.lockedUntil = Instant.now().plus(LOCK_DURATION);
-            System.out.println("HIT MAX ATTEMPTS! Account is now LOCKED.");
+            logger.warn("達到最大失敗次數，帳戶已鎖定 {} 分鐘 - 領域: {}, 用戶: {}", LOCK_DURATION.toMinutes(), realm, username);
         }
 
-        System.out.println("All attempts in map: " + attempts.toString());
-
-        LoginAttemptStatus status = getStatus(key);
-        System.out.println("Returned status - locked: " + status.locked() +
-                ", remainingAttempts: " + status.remainingAttempts());
-        System.out.println("=== registerFailure END ===\n");
-
-        return status;
+        return getStatus(key);
     }
 
+    /**
+     * 記錄登入成功，清除失敗記錄
+     * 
+     * @param realm 登入領域
+     * @param username 用戶名
+     */
     public void registerSuccess(SessionService.Realm realm, String username) {
-        System.out.println("\n=== registerSuccess ===");
-        System.out.println("Removing key for: " + realm + " / " + username);
-        attempts.remove(key(realm, username));
-        System.out.println("=== registerSuccess END ===\n");
+        String key = key(realm, username);
+        AttemptState removed = attempts.remove(key);
+        if (removed != null) {
+            logger.info("登入成功，清除失敗記錄 - 領域: {}, 用戶: {}", realm, username);
+        }
     }
 
     private static final class AttemptState {

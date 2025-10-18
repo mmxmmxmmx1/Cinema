@@ -6,7 +6,10 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -14,11 +17,25 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.cinema.dao.UserDao;
+import com.example.cinema.exception.UserRegistrationException;
 import com.example.cinema.model.User;
 import com.example.cinema.model.User.UserType;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+/**
+ * 用戶服務，處理用戶註冊、認證和個人資料管理
+ */
 @Service
+@Tag(name = "User Service", description = "處理用戶註冊、認證和個人資料管理")
 public class UserService {
+    private static final Logger logger = LoggerFactory.getLogger(UserService.class);
+    private static final String USER_ROLE = "ROLE_USER";
+    private static final String ADMIN_ROLE = "ROLE_ADMIN";
+    private static final String EMPLOYEE_ROLE = "ROLE_EMPLOYEE";
 
     private final UserDao userDao;
     private final PasswordEncoder passwordEncoder;
@@ -30,50 +47,142 @@ public class UserService {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public Long registerUser(String username, String rawPassword, UserType userType, boolean asAdmin) {
-        String hash = passwordEncoder.encode(rawPassword);
-        Long userId = userDao.createUser(username, hash, userType);
-        userDao.assignRole(userId, "ROLE_USER");
-        if (asAdmin) {
-            userDao.assignRole(userId, "ROLE_ADMIN");
+    /**
+     * 註冊新用戶
+     * 
+     * @param username 用戶名
+     * @param rawPassword 明文密碼
+     * @param userType 用戶類型
+     * @param asAdmin 是否為管理員
+     * @return 用戶ID
+     * @throws UserRegistrationException 當註冊失敗時拋出
+     */
+    @Operation(summary = "註冊新用戶", description = "註冊一個新的用戶帳號")
+    @ApiResponse(responseCode = "200", description = "用戶註冊成功")
+    @ApiResponse(responseCode = "400", description = "無效的輸入參數")
+    @ApiResponse(responseCode = "409", description = "用戶名已存在")
+    public Long registerUser(
+            @Parameter(description = "用戶名", required = true) String username,
+            @Parameter(description = "明文密碼", required = true) String rawPassword,
+            @Parameter(description = "用戶類型") UserType userType,
+            @Parameter(description = "是否為管理員") boolean asAdmin) {
+        
+        logger.info("開始註冊用戶: {}", username);
+        try {
+            String hash = passwordEncoder.encode(rawPassword);
+            Long userId = userDao.createUser(username, hash, userType);
+            
+            // 分配基本用戶角色
+            userDao.assignRole(userId, USER_ROLE);
+            
+            // 如果需要，分配管理員角色
+            if (asAdmin) {
+                userDao.assignRole(userId, ADMIN_ROLE);
+                logger.info("已為用戶 {} 分配管理員權限", username);
+            }
+            
+            logger.info("用戶註冊成功，用戶ID: {}", userId);
+            return userId;
+            
+        } catch (DuplicateKeyException e) {
+            String errorMsg = String.format("用戶名 %s 已存在", username);
+            logger.warn(errorMsg);
+            throw new UserRegistrationException(errorMsg, e);
+        } catch (Exception e) {
+            String errorMsg = String.format("註冊用戶 %s 時發生錯誤", username);
+            logger.error(errorMsg, e);
+            throw new UserRegistrationException(errorMsg, e);
         }
-        return userId;
     }
 
-    public Long registerEmployee(String username, String rawPassword) {
-        String hash = passwordEncoder.encode(rawPassword);
-        Long userId = userDao.createUser(username, hash, UserType.EMPLOYEE);
-        userDao.assignRole(userId, "ROLE_EMPLOYEE");
-        return userId;
+    /**
+     * 註冊新員工
+     * 
+     * @param username 員工用戶名
+     * @param rawPassword 明文密碼
+     * @return 員工用戶ID
+     * @throws UserRegistrationException 當註冊失敗時拋出
+     */
+    @Operation(summary = "註冊新員工", description = "註冊一個新的員工帳號")
+    @ApiResponse(responseCode = "200", description = "員工註冊成功")
+    @ApiResponse(responseCode = "400", description = "無效的輸入參數")
+    @ApiResponse(responseCode = "409", description = "用戶名已存在")
+    public Long registerEmployee(
+            @Parameter(description = "員工用戶名", required = true) String username,
+            @Parameter(description = "明文密碼", required = true) String rawPassword) {
+        
+        logger.info("開始註冊員工: {}", username);
+        try {
+            String hash = passwordEncoder.encode(rawPassword);
+            Long userId = userDao.createUser(username, hash, UserType.EMPLOYEE);
+            userDao.assignRole(userId, EMPLOYEE_ROLE);
+            
+            logger.info("員工註冊成功，用戶ID: {}", userId);
+            return userId;
+            
+        } catch (DuplicateKeyException e) {
+            String errorMsg = String.format("員工用戶名 %s 已存在", username);
+            logger.warn(errorMsg);
+            throw new UserRegistrationException(errorMsg, e);
+        } catch (Exception e) {
+            String errorMsg = String.format("註冊員工 %s 時發生錯誤", username);
+            logger.error(errorMsg, e);
+            throw new UserRegistrationException(errorMsg, e);
+        }
     }
 
+    /**
+     * 合併訪客的觀看清單到用戶帳號
+     * 
+     * @param username 目標用戶名
+     * @param movieIds 要合併的電影ID集合
+     */
     @Transactional
-    public void mergeGuestWatchlistIntoUser(String username, Collection<Long> movieIds) {
+    @Operation(summary = "合併觀看清單", description = "將訪客的觀看清單合併到登入用戶的帳號")
+    @ApiResponse(responseCode = "200", description = "清單合併成功")
+    @ApiResponse(responseCode = "400", description = "無效的輸入參數")
+    public void mergeGuestWatchlistIntoUser(
+            @Parameter(description = "目標用戶名", required = true) String username,
+            @Parameter(description = "要合併的電影ID集合") Collection<Long> movieIds) {
+        
+        logger.debug("開始合併觀看清單，用戶: {}", username);
+        
         if (movieIds == null || movieIds.isEmpty()) {
+            logger.debug("沒有需要合併的電影ID");
             return;
         }
+        
         User user = userDao.findByUsername(username).orElse(null);
         if (user == null) {
+            logger.warn("找不到用戶: {}", username);
             return;
         }
 
+        // 去重並過濾空值
         Set<Long> deduplicated = movieIds.stream()
                 .filter(Objects::nonNull)
                 .collect(Collectors.toCollection(HashSet::new));
+                
         if (deduplicated.isEmpty()) {
+            logger.debug("過濾後沒有有效的電影ID");
             return;
         }
 
-        Set<Long> existing;
+        // 獲取用戶現有的觀看清單
+        Set<Long> existing = new HashSet<>();
         try {
             existing = new HashSet<>(jdbcTemplate.queryForList(
                     "SELECT movie_id FROM user_watchlist WHERE user_id = ?",
                     Long.class,
                     user.getId()));
+            logger.debug("用戶 {} 現有 {} 部電影在觀看清單中", username, existing.size());
         } catch (DataAccessException ex) {
-            existing = new HashSet<>();
+            logger.error("獲取用戶 {} 的觀看清單時出錯", username, ex);
+            return;
         }
 
+        // 合併清單
+        int addedCount = 0;
         for (Long movieId : deduplicated) {
             if (!existing.contains(movieId)) {
                 try {
@@ -81,48 +190,96 @@ public class UserService {
                             "INSERT INTO user_watchlist (user_id, movie_id) VALUES (?, ?)",
                             user.getId(),
                             movieId);
-                } catch (DataAccessException ignore) {
+                    addedCount++;
+                } catch (DataAccessException e) {
+                    logger.warn("無法將電影ID {} 添加到用戶 {} 的觀看清單", movieId, username, e);
                 }
             }
         }
+        
+        logger.info("成功為用戶 {} 添加了 {} 部新電影到觀看清單", username, addedCount);
+    
     }
 
+    /**
+     * 確保用戶擁有基本角色
+     * 
+     * @param username 要檢查的用戶名
+     */
     @Transactional
-    public void ensureBasicRole(String username) {
+    @Operation(summary = "確保用戶擁有基本角色", description = "如果用戶沒有任何角色，則為其分配基本用戶角色")
+    @ApiResponse(responseCode = "200", description = "操作完成")
+    public void ensureBasicRole(
+            @Parameter(description = "要檢查的用戶名", required = true) String username) {
+        
+        logger.debug("檢查用戶 {} 的角色分配", username);
+        
         User user = userDao.findByUsername(username).orElse(null);
         if (user == null) {
+            logger.warn("找不到用戶: {}", username);
             return;
         }
 
+        // 如果用戶已有角色，則不需要處理
         if (user.getRoles() != null && !user.getRoles().isEmpty()) {
+            logger.debug("用戶 {} 已有角色，跳過", username);
             return;
         }
 
-        Long roleId;
+        logger.info("用戶 {} 沒有分配任何角色，正在分配基本用戶角色", username);
+        
+        // 嘗試獲取基本用戶角色ID
+        Long roleId = null;
         try {
             roleId = jdbcTemplate.queryForObject(
                     "SELECT id FROM roles WHERE code = ?",
                     Long.class,
-                    "ROLE_USER");
+                    USER_ROLE);
         } catch (EmptyResultDataAccessException ex) {
-            jdbcTemplate.update(
-                    "INSERT INTO roles (code, name) VALUES (?, ?)",
-                    "ROLE_USER",
-                    "一般使用者");
-            roleId = jdbcTemplate.queryForObject(
-                    "SELECT id FROM roles WHERE code = ?",
-                    Long.class,
-                    "ROLE_USER");
+            logger.info("基本用戶角色不存在，正在創建...");
+            try {
+                // 創建基本用戶角色
+                jdbcTemplate.update(
+                        "INSERT INTO roles (code, name, description, level) VALUES (?, ?, ?, ?)",
+                        USER_ROLE,
+                        "一般使用者",
+                        "基本用戶角色",
+                        10);
+                
+                // 獲取新創建的角色ID
+                roleId = jdbcTemplate.queryForObject(
+                        "SELECT id FROM roles WHERE code = ?",
+                        Long.class,
+                        USER_ROLE);
+                
+                logger.info("已創建基本用戶角色，ID: {}", roleId);
+                
+            } catch (DataAccessException e) {
+                logger.error("創建基本用戶角色時出錯", e);
+                return;
+            }
         } catch (DataAccessException ex) {
+            logger.error("查詢基本用戶角色時出錯", ex);
             return;
         }
 
-        try {
-            jdbcTemplate.update(
-                    "INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)",
-                    user.getId(),
-                    roleId);
-        } catch (DataAccessException ignore) {
+        // 為用戶分配角色
+        if (roleId != null) {
+            try {
+                int updated = jdbcTemplate.update(
+                        "INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)",
+                        user.getId(),
+                        roleId);
+                
+                if (updated > 0) {
+                    logger.info("已為用戶 {} 分配基本用戶角色 (ID: {})", username, roleId);
+                } else {
+                    logger.debug("用戶 {} 已擁有基本用戶角色", username);
+                }
+                
+            } catch (DataAccessException e) {
+                logger.error("為用戶 {} 分配角色時出錯", username, e);
+            }
         }
     }
 }
