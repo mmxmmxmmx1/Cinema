@@ -13,6 +13,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
@@ -52,26 +53,31 @@ public class SecurityConfig {
     }
 
     @Bean
-    public UserDetailsService userDetailsService() {
-        return username -> {
-            User user = userDao.findByUsername(username)
-                    .orElseThrow(() -> new UsernameNotFoundException("User not found with username: " + username));
-            return new org.springframework.security.core.userdetails.User(
-                    user.getUsername(),
-                    user.getPassword(),
-                    user.getRoles().stream()
-                            .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getCode()))
-                            .collect(Collectors.toList()));
-        };
-    }
-
-    @Bean
     @Order(1)
     public SecurityFilterChain employeeSecurityFilterChain(HttpSecurity http) throws Exception {
         http.securityMatcher("/employee/**")
+                .userDetailsService(username -> {
+                    // ⚠️ 重要：在驗證密碼之前先檢查帳號是否被鎖定
+                    var employeeStatus = loginAttemptService.getStatus(SessionService.Realm.EMPLOYEE, username);
+                    if (employeeStatus.locked()) {
+                        long minutes = Math.max(1, (employeeStatus.lockDuration().getSeconds() + 59) / 60);
+                        throw new LockedException("帳號已被鎖定 " + minutes + " 分鐘，請稍後再試。");
+                    }
+                    
+                    // 只從 employee 表查詢
+                    User user = userDao.findEmployeeByUsername(username)
+                            .orElseThrow(() -> new UsernameNotFoundException("Employee not found: " + username));
+                    return new org.springframework.security.core.userdetails.User(
+                            user.getUsername(),
+                            user.getPassword(),
+                            user.getRoles().stream()
+                                    .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getCode()))
+                                    .collect(Collectors.toList()));
+                })
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/employee/login", "/employee/login/").permitAll()
-                        .requestMatchers("/employee/dashboard").hasAnyRole("EMPLOYEE", "IT", "MANAGER", "ADMIN")
+                        .requestMatchers("/employee", "/employee/", "/employee/dashboard")
+                        .hasAnyRole("EMPLOYEE", "IT", "MANAGER", "ADMIN")
                         .requestMatchers("/employee/it/**").access((authentication, context) -> {
                             return hasMinimumLevel(authentication.get(), 20);
                         })
@@ -81,6 +87,7 @@ public class SecurityConfig {
                         .requestMatchers("/employee/admin/**").hasRole("ADMIN")
                         .requestMatchers("/employee/**").hasAnyRole("EMPLOYEE", "IT", "MANAGER", "ADMIN")
                         .anyRequest().authenticated())
+
                 .csrf(csrf -> csrf.ignoringRequestMatchers("/employee/**"))
                 .formLogin(login -> login
                         .loginPage("/employee/login").permitAll()
@@ -104,21 +111,7 @@ public class SecurityConfig {
                             String username = authentication.getName();
                             String clientIp = getClientIp(request);
 
-                            // 檢查帳號是否被鎖定
-                            var userStatus = loginAttemptService.getStatus(SessionService.Realm.EMPLOYEE, username);
-                            if (userStatus != null && userStatus.locked()) {
-                                // 被鎖定時，保留 session 並設定鎖定狀態
-                                HttpSession session = request.getSession(true);
-                                sessionService.applyFailureFeedback(session, SessionService.Realm.EMPLOYEE, userStatus);
-
-                                // 清除 Spring Security 的認證，但保留 session
-                                SecurityContextHolder.clearContext();
-
-                                // 導回登入頁
-                                response.sendRedirect("/employee/login?error");
-                                return;
-                            }
-
+                            // ✅ 帳號鎖定檢查已移至 userDetailsService()，這裡只檢查 IP 鎖定
                             // 檢查 IP 是否被鎖定
                             var ipStatus = loginAttemptService.getStatus(SessionService.Realm.EMPLOYEE, clientIp);
                             if (ipStatus != null && ipStatus.locked()) {
@@ -156,9 +149,27 @@ public class SecurityConfig {
     @Order(2)
     public SecurityFilterChain memberSecurityFilterChain(HttpSecurity http) throws Exception {
         http.securityMatcher("/member/**")
+                .userDetailsService(username -> {
+                    // ⚠️ 重要：在驗證密碼之前先檢查帳號是否被鎖定
+                    var memberStatus = loginAttemptService.getStatus(SessionService.Realm.MEMBER, username);
+                    if (memberStatus.locked()) {
+                        long minutes = Math.max(1, (memberStatus.lockDuration().getSeconds() + 59) / 60);
+                        throw new LockedException("帳號已被鎖定 " + minutes + " 分鐘，請稍後再試。");
+                    }
+                    
+                    // 只從 members 表查詢
+                    User user = userDao.findMemberByUsername(username)
+                            .orElseThrow(() -> new UsernameNotFoundException("Member not found: " + username));
+                    return new org.springframework.security.core.userdetails.User(
+                            user.getUsername(),
+                            user.getPassword(),
+                            user.getRoles().stream()
+                                    .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getCode()))
+                                    .collect(Collectors.toList()));
+                })
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/member/login", "/member/login/").permitAll()
-                        .requestMatchers("/member/**").hasRole("CUSTOMER")
+                        .requestMatchers("/member/**").hasRole("MEMBER")
                         .anyRequest().authenticated())
                 .csrf(csrf -> csrf.ignoringRequestMatchers("/member/**"))
                 .formLogin(login -> login
@@ -183,21 +194,7 @@ public class SecurityConfig {
                             String username = authentication.getName();
                             String clientIp = getClientIp(request);
 
-                            // 檢查帳號是否被鎖定
-                            var userStatus = loginAttemptService.getStatus(SessionService.Realm.MEMBER, username);
-                            if (userStatus != null && userStatus.locked()) {
-                                // 被鎖定時，保留 session 並設定鎖定狀態
-                                HttpSession session = request.getSession(true);
-                                sessionService.applyFailureFeedback(session, SessionService.Realm.MEMBER, userStatus);
-
-                                // 清除 Spring Security 的認證，但保留 session
-                                SecurityContextHolder.clearContext();
-
-                                // 導回登入頁
-                                response.sendRedirect("/member/login?error");
-                                return;
-                            }
-
+                            // ✅ 帳號鎖定檢查已移至 userDetailsService()，這裡只檢查 IP 鎖定
                             // 檢查 IP 是否被鎖定
                             var ipStatus = loginAttemptService.getStatus(SessionService.Realm.MEMBER, clientIp);
                             if (ipStatus != null && ipStatus.locked()) {
@@ -287,7 +284,7 @@ public class SecurityConfig {
         try {
             User user = userDao.findByUsername(authentication.getName()).orElse(null);
             if (user == null || user.getRoles().isEmpty()) {
-                return "/employee/dashboard";
+                return "/employee";
             }
 
             int level = user.getRoles().stream()
@@ -302,10 +299,10 @@ public class SecurityConfig {
             } else if (level >= 20) {
                 return "/employee/it/dashboard";
             } else {
-                return "/employee/dashboard";
+                return "/employee";  // 基本員工導向 /employee
             }
         } catch (Exception e) {
-            return "/employee/dashboard";
+            return "/employee";
         }
     }
 
@@ -315,7 +312,7 @@ public class SecurityConfig {
             return;
         }
 
-        if (!hasAuthority(authentication.getAuthorities(), "ROLE_CUSTOMER")) {
+        if (!hasAuthority(authentication.getAuthorities(), "ROLE_MEMBER")) {
             return;
         }
 
