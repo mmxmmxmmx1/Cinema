@@ -49,8 +49,8 @@ public class UserDao {
     private static class MemberMapper implements RowMapper<User> {
         @Override
         public User mapRow(ResultSet rs, int rowNum) throws SQLException {
-            // 會員固定 CUSTOMER 角色
-            Role customerRole = new Role(1L, "CUSTOMER", "Customer", "Member customer", 1);
+            // 會員固定 MEMBER 角色（SecurityConfig 會自動加上 ROLE_ 前綴）
+            Role memberRole = new Role(5L, "MEMBER", "Member", "Regular member", 1);
 
             return new User(
                     rs.getLong("id"),
@@ -60,9 +60,9 @@ public class UserDao {
                     rs.getString("email"),
                     rs.getString("phone"),
                     rs.getString("password"),
-                    UserType.CUSTOMER,
+                    UserType.MEMBER,
                     rs.getTimestamp("created_at").toLocalDateTime(),
-                    List.of(customerRole) // 在建構子中傳入 roles
+                    List.of(memberRole) // 在建構子中傳入 roles
             );
         }
     }
@@ -94,7 +94,7 @@ public class UserDao {
     }
 
     public Long createUser(String username, String encodedPassword, UserType userType) {
-        if (userType == UserType.CUSTOMER) {
+        if (userType == UserType.MEMBER) {
             // 插入會員
             jdbcTemplate.update(
                     "INSERT INTO members (nickname, password, first_name, last_name) VALUES (?, ?, '', '')",
@@ -122,5 +122,35 @@ public class UserDao {
         jdbcTemplate.update(
                 "UPDATE employee SET role_id = ? WHERE id = ?",
                 roleId, userId);
+    }
+
+    /**
+     * 只從 members 表查詢用戶
+     */
+    public Optional<User> findMemberByUsername(String username) {
+        String memberSql = "SELECT * FROM members WHERE nickname = ?";
+        try {
+            User member = jdbcTemplate.queryForObject(memberSql, new MemberMapper(), username);
+            return Optional.ofNullable(member);
+        } catch (EmptyResultDataAccessException e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * 只從 employee 表查詢用戶
+     */
+    public Optional<User> findEmployeeByUsername(String username) {
+        String employeeSql = "SELECT e.*, r.id as role_id, r.code as role_code, r.name as role_name, " +
+                "r.description as role_desc, r.level as role_level " +
+                "FROM employee e " +
+                "JOIN roles r ON e.role_id = r.id " +
+                "WHERE e.nickname = ?";
+        try {
+            User employee = jdbcTemplate.queryForObject(employeeSql, new EmployeeWithRoleMapper(), username);
+            return Optional.ofNullable(employee);
+        } catch (EmptyResultDataAccessException e) {
+            return Optional.empty();
+        }
     }
 }

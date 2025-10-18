@@ -6,9 +6,9 @@ import java.util.List;
 public class User {
 
     public enum UserType {
-        CUSTOMER, // 純會員
+        MEMBER,   // 純會員
         EMPLOYEE, // 純員工
-        BOTH // 既是會員又是員工
+        BOTH      // 既是會員又是員工
     }
 
     private final Long id;
@@ -84,8 +84,14 @@ public class User {
         return roles;
     }
 
+    public boolean isMember() {
+        return userType == UserType.MEMBER || userType == UserType.BOTH;
+    }
+
+    // 為了向後兼容，保留 isCustomer() 方法
+    @Deprecated
     public boolean isCustomer() {
-        return userType == UserType.CUSTOMER || userType == UserType.BOTH;
+        return isMember();
     }
 
     public boolean isEmployee() {
