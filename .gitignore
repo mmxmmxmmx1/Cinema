@@ -1,1 +1,40 @@
-/target/ 
+# Maven
+/target/
+*.jar
+*.war
+*.ear
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Spring Boot
+spring-boot-devtools.properties
+application-local.properties
+
+# Node (如果有前端構建)
+node_modules/
+dist/
+build/
+
+# Temporary files
+*.tmp
+*.bak
+*.cache
