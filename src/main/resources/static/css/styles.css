@@ -242,20 +242,24 @@ body {
 
 .back-link {
   display: inline-block;
-  padding: 0.6rem 1.2rem;
-  background: transparent;
+  padding: 0.8rem 1.6rem;
+  background: linear-gradient(135deg, #4a90e2, #357abd);
   color: #fff;
   text-decoration: none;
-  border: 2px solid #fff;
-  border-radius: 6px;
+  border: 2px solid #5a9fe5;
+  border-radius: 8px;
   margin: 1rem;
   cursor: pointer;
   transition: all 0.3s ease;
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 1.1rem;
+  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
 }
 
 .back-link:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(135deg, #5a9fe5, #4a90e2);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(74, 144, 226, 0.4);
 }
 
 /* ========== 浮動按鈕 ========== */
