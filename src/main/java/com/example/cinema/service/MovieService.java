@@ -144,7 +144,7 @@ public class MovieService {
                     movieId + "-st" + (i + 1),
                     startTimes[i],
                     durationMinutes,
-                    (i % 3) + "號廳"));
+                    (i % 3+1) + "號廳"));
         }
         return entries;
     }
