@@ -315,6 +315,7 @@ body {
   height: auto;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  margin-top: 6rem;
 }
 
 .movie-detail-card h2 {
@@ -371,6 +372,45 @@ body {
 }
 
 /* ========== 座位選擇 ========== */
+.seat-selection-layout {
+  display: grid;
+  grid-template-columns: 350px 1fr;
+  gap: 3rem;
+  background: #2c2c2c;
+  border-radius: 12px;
+  padding: 2rem;
+  margin-top: 1rem;
+}
+
+.movie-info-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.movie-poster {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  margin-bottom: 1.5rem;
+}
+
+.movie-info h2 {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.movie-info p {
+  color: #b8b8b8;
+  margin-bottom: 0.5rem;
+}
+
+.seat-area {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
 .seat-layout {
   background: #2c2c2c;
   border-radius: 12px;

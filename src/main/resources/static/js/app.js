@@ -131,21 +131,25 @@ const SeatSelectionPage = {
         <template v-else>
           <button class="back-link" @click="goBack">返回</button>
           <div class="seat-selection">
-            <div class="movie-detail-card">
-              <img :src="movie.posterUrl" :alt="movie.title" />
-              <div>
-                <h2>{{ movie.title }}</h2>
-                <p>{{ details.showtime.startTime }} · {{ details.showtime.auditorium }}</p>
-                <p>{{ details.showtime.durationMinutes }} 分鐘</p>
+            <div class="seat-selection-layout">
+              <div class="movie-info-section">
+                <img :src="movie.posterUrl" :alt="movie.title" class="movie-poster" />
+                <div class="movie-info">
+                  <h2>{{ movie.title }}</h2>
+                  <p>{{ details.showtime.startTime }} · {{ details.showtime.auditorium }}</p>
+                  <p>{{ details.showtime.durationMinutes }} 分鐘</p>
+                </div>
               </div>
-            </div>
-            <div class="seat-grid" role="grid">
-              <div v-for="(row, rowIndex) in seatRows" :key="rowIndex" class="seat-row">
-                <span class="row-label">{{ String.fromCharCode(65 + rowIndex) }}</span>
-                <div class="seat-row-grid">
-                  <button v-for="seat in row" :key="seat.seatId" type="button" :class="getSeatClass(seat)" @click="toggleSeat(seat.seatId, seat.reserved)">
-                    {{ seat.seatId.substring(1) }}
-                  </button>
+              <div class="seat-area">
+                <div class="seat-grid" role="grid">
+                  <div v-for="(row, rowIndex) in seatRows" :key="rowIndex" class="seat-row">
+                    <span class="row-label">{{ String.fromCharCode(65 + rowIndex) }}</span>
+                    <div class="seat-row-grid">
+                      <button v-for="seat in row" :key="seat.seatId" type="button" :class="getSeatClass(seat)" @click="toggleSeat(seat.seatId, seat.reserved)">
+                        {{ seat.seatId.substring(1) }}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
