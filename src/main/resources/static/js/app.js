@@ -1,4 +1,4 @@
-﻿const { createApp } = Vue;
+const { createApp } = Vue;
 const { createRouter, createWebHistory } = VueRouter;
 
 const LoadingState = {
@@ -18,7 +18,7 @@ const Hero = {
         <img class="hero-badge" src="/images/sleep.jpg" alt="Very Sleepy Cinema 徽章">
         <div class="hero-text">
           <h1>很好睡電影院</h1>
-          <p>每個顧客都可以睡得很安穩</p>
+          <p style="color: #0044BB;">每個顧客都可以睡得很安穩</p>
         </div>
       </div>
     </header>
