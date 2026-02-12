@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Enforce Migration Immutability
+        if: github.event_name == 'pull_request'
+        run: ./scripts/check-migration-immutability.sh "${{ github.base_ref }}"
+
+      - name: Verify with Maven
+        run: mvn -B clean test
+
+      - name: Enforce Test Suite Baseline
+        run: |
+          total_tests=$(grep -Rho 'tests="[0-9]\+"' target/surefire-reports/*.xml | grep -Eo '[0-9]+' | awk '{sum+=$1} END {print sum+0}')
+          echo "Total executed tests: ${total_tests}"
+          if [ "${total_tests}" -lt 50 ]; then
+            echo "Test suite baseline violated: expected at least 50 tests."
+            exit 1
+          fi

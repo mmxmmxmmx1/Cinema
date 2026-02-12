@@ -11,7 +11,7 @@
     <artifactId>cinema</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>cinema</name>
-    <description>Cinema website with React frontend and Spring Boot backend</description>
+    <description>Cinema website with Vue SPA + Thymeleaf pages on Spring Boot backend</description>
     <properties>
         <java.version>17</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -55,13 +55,23 @@
             <artifactId>spring-boot-starter-jdbc</artifactId>
         </dependency>
 
+        <!-- Database migrations -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
+        </dependency>
+
         <!-- SpringDoc OpenAPI (Swagger) -->
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>2.3.0</version>
         </dependency>
-        
+
         <!-- Logging -->
         <dependency>
             <groupId>org.projectlombok</groupId>

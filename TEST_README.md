@@ -6,15 +6,14 @@
 
 ## 測試結構
 
-```
-src/test/java/com/example/cinema/
-├── service/
-│   ├── MovieServiceTest.java          # 電影服務測試
-│   └── SessionServiceTest.java        # 會話服務測試
-├── controller/
-│   └── MemberApiControllerTest.java   # 會員 API 控制器測試
-└── integration/
-    └── MovieIntegrationTest.java      # 電影功能整合測試
+目前測試分為三層：
+- `src/test/java/com/example/cinema/service`：服務層單元測試
+- `src/test/java/com/example/cinema/controller`：控制器測試
+- `src/test/java/com/example/cinema/integration`：流程整合測試
+
+可用下列指令查看當前測試檔案清單：
+```bash
+find src/test/java -name '*Test.java' -o -name '*IntegrationTest.java'
 ```
 
 ## 測試覆蓋範圍
@@ -30,7 +29,7 @@ src/test/java/com/example/cinema/
 - ✅ 驗證座位佈局的一致性
 - ✅ 驗證已預訂和可用座位
 
-**測試數量**: 11 個測試
+測試案例會隨功能迭代增加，請以 CI 執行結果為準。
 
 ### 2. SessionServiceTest (會話服務測試)
 - ✅ 獲取訪客觀看清單鍵
@@ -43,7 +42,7 @@ src/test/java/com/example/cinema/
 - ✅ 驗證鎖定時間
 - ✅ 不同領域的獨立嘗試計數
 
-**測試數量**: 9 個測試
+測試案例會隨功能迭代增加，請以 CI 執行結果為準。
 
 ### 3. MemberApiControllerTest (會員 API 控制器測試)
 - ✅ 添加電影到訪客觀看清單
@@ -53,7 +52,7 @@ src/test/java/com/example/cinema/
 - ✅ 未認證用戶訪問限制
 - ✅ 添加多部電影到觀看清單
 
-**測試數量**: 6 個測試
+測試案例會隨功能迭代增加，請以 CI 執行結果為準。
 
 ### 4. MovieIntegrationTest (電影功能整合測試)
 - ✅ 獲取所有電影列表
@@ -65,13 +64,85 @@ src/test/java/com/example/cinema/
 - ✅ 驗證海報 URL
 - ✅ 驗證電影描述
 
-**測試數量**: 8 個測試
+測試案例會隨功能迭代增加，請以 CI 執行結果為準。
 
 ## 運行測試
 
 ### 運行所有測試
 ```bash
 mvn test
+```
+
+## Demo 帳號與資料庫操作 (MySQL)
+
+### 環境變數 (建議)
+正式環境不要把資料庫連線資訊寫死在專案內，建議用環境變數提供：
+
+- `SPRING_PROFILES_ACTIVE=dev` (本機) 或 `SPRING_PROFILES_ACTIVE=prod` (上線)
+- `DB_URL`
+- `DB_USERNAME`
+- `DB_PASSWORD`
+
+範例可參考專案根目錄的 `.env.example`。
+
+### 目前預設測試帳號 (members 與 employee 兩邊同步)
+以下帳號在 `members` 與 `employee` 兩張表都存在，且密碼 = 帳號（bcrypt 雜湊存放）。
+
+- `member01 / member01`
+- `test123 / test123`
+- `emp01 / emp01`
+- `em01 / em01`
+
+登入入口：
+- 會員：`/member/login`
+- 員工：`/employee/login`
+- 統一入口（會轉發到正確的登入處理）：`/login?target=member`、`/login?target=employee`
+
+### 查詢目前帳號清單與角色
+```sql
+SELECT 'members' AS tbl, id, nickname, LEFT(password, 24) AS password_prefix
+FROM members
+ORDER BY nickname;
+
+SELECT 'employee' AS tbl, e.id, e.nickname, r.code AS role_code, r.level,
+       LEFT(e.password, 24) AS password_prefix
+FROM employee e
+JOIN roles r ON r.id = e.role_id
+ORDER BY e.nickname;
+```
+
+### 升級/降級員工角色（用來 demo IT / 主管 / 管理頁）
+員工後台導向與權限取決於 `employee.role_id -> roles.code/level`。
+
+如果你已經有 ADMIN 權限，也可以直接用後台頁面操作：
+- `/employee/admin/roles`
+
+將指定員工升級為 IT：
+```sql
+UPDATE employee
+SET role_id = (SELECT id FROM roles WHERE code = 'IT' LIMIT 1)
+WHERE nickname = 'member01';
+```
+
+升級為 MANAGER：
+```sql
+UPDATE employee
+SET role_id = (SELECT id FROM roles WHERE code = 'MANAGER' LIMIT 1)
+WHERE nickname = 'member01';
+```
+
+升級為 ADMIN：
+```sql
+UPDATE employee
+SET role_id = (SELECT id FROM roles WHERE code = 'ADMIN' LIMIT 1)
+WHERE nickname = 'member01';
+```
+
+降回一般員工 EMPLOYEE：
+```sql
+UPDATE employee
+SET role_id = (SELECT id FROM roles WHERE code = 'EMPLOYEE' LIMIT 1)
+WHERE nickname = 'member01';
 ```
 
 ### 運行特定測試類
@@ -89,12 +160,10 @@ mvn test -Dtest=MemberApiControllerTest
 mvn test -Dtest=MovieIntegrationTest
 ```
 
-### 運行測試並生成報告
+### 查看測試摘要報告
 ```bash
-mvn test jacoco:report
+ls target/surefire-reports
 ```
-
-報告將生成在 `target/site/jacoco/index.html`
 
 ## 測試覆蓋率目標
 
@@ -117,10 +186,12 @@ mvn test jacoco:report
 ```yaml
 # GitHub Actions 範例
 - name: Run tests
-  run: mvn test
+  run: mvn clean test
 
-- name: Generate test report
-  run: mvn jacoco:report
+- name: Enforce test baseline
+  run: |
+    total_tests=$(grep -Rho 'tests="[0-9]\+"' target/surefire-reports/*.xml | grep -Eo '[0-9]+' | awk '{sum+=$1} END {print sum+0}')
+    test "${total_tests}" -ge 50
 ```
 
 ## 測試數據
@@ -161,4 +232,4 @@ A: 使用 `mvn test -Dtest=*IntegrationTest`
 4. 提供代碼使用範例
 5. 作為文檔參考
 
-**總測試數量**: 34 個測試
+**總測試數量**: 請以 `mvn test`/CI 輸出為準（避免文件數字過期）。
