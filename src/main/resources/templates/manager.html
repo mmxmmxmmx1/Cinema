@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${title}">主管儀表板</title>
+    <style>
+        body { font-family: "Noto Sans TC", "Segoe UI", Arial, sans-serif; margin: 0; background: #0f1626; color: #f4f6ff; }
+        header { padding: 30px 44px; background: linear-gradient(135deg, #2a2f55, #1b2242); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); }
+        h1 { margin: 0; font-size: 26px; }
+        main { padding: 36px 44px; display: grid; gap: 20px; max-width: 1400px; margin: 0 auto; }
+        section { background: rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 22px; border: 1px solid rgba(255, 255, 255, 0.08); }
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+        .kpi-card { background: rgba(10, 16, 30, 0.65); padding: 18px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
+        .kpi-card h3 { margin: 0 0 6px 0; font-size: 15px; color: #9ad0ff; }
+        .kpi-card p { margin: 0; font-size: 26px; font-weight: 600; }
+        a { color: #8ec7ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        button { background: #2f89ff; color: #fff; border: none; padding: 10px 24px; border-radius: 20px; cursor: pointer; }
+        button:hover { background: #4c9aff; }
+        .footer { display: flex; gap: 14px; align-items: center; }
+        form { margin: 0; }
+    </style>
+</head>
+<body>
+<header>
+    <h1 th:text="${title}">很好睡電影院 主管儀表板</h1>
+    <p th:text="${message}">查看營運概況、票務熱區與員工排班摘要。</p>
+</header>
+<main>
+    <section>
+        <h2>今日概況</h2>
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <h3>上座率</h3>
+                <p>72%</p>
+            </div>
+            <div class="kpi-card">
+                <h3>高峰時段</h3>
+                <p>19:00</p>
+            </div>
+            <div class="kpi-card">
+                <h3>異常場次</h3>
+                <p>0</p>
+            </div>
+        </div>
+    </section>
+    <section>
+        <h2>待辦提醒</h2>
+        <ul>
+            <li>確認週末排班是否完成覆蓋。</li>
+            <li>檢查售票高峰的櫃台人力安排。</li>
+            <li>追蹤今日客訴是否已結案。</li>
+        </ul>
+    </section>
+    <div class="footer">
+        <form method="post" action="/employee/logout">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <button type="submit">登出</button>
+        </form>
+        <form id="manager-auto-logout" method="post" action="/employee/logout" style="display: none;">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        </form>
+        <a href="/">← 回首頁</a>
+    </div>
+</main>
+<script>
+    (function() {
+        const logoutForm = document.getElementById('manager-auto-logout');
+        if (!logoutForm) return;
+
+        const INACTIVITY_LIMIT = 10 * 60 * 1000;
+        const HEARTBEAT_INTERVAL = 60 * 1000;
+        const events = ['click', 'mousemove', 'keydown', 'scroll', 'touchstart', 'touchmove'];
+        let triggered = false;
+        let lastHeartbeat = Date.now();
+        let timer = setTimeout(triggerLogout, INACTIVITY_LIMIT);
+
+        function resetTimer() {
+            if (triggered) return;
+            clearTimeout(timer);
+            timer = setTimeout(triggerLogout, INACTIVITY_LIMIT);
+            sendHeartbeat();
+        }
+
+        function triggerLogout() {
+            if (triggered) return;
+            triggered = true;
+            logoutForm.submit();
+        }
+
+        function sendHeartbeat() {
+            const now = Date.now();
+            if (now - lastHeartbeat < HEARTBEAT_INTERVAL) return;
+            lastHeartbeat = now;
+            if (navigator.sendBeacon) {
+                try {
+                    navigator.sendBeacon('/employee/manager/activity', new Blob([], { type: 'text/plain' }));
+                    return;
+                } catch (err) {}
+            }
+            fetch('/employee/manager/activity', { method: 'POST', keepalive: true }).catch(function() {});
+        }
+
+        events.forEach(function(evt) {
+            document.addEventListener(evt, resetTimer, { passive: true });
+        });
+
+        sendHeartbeat();
+    })();
+</script>
+</body>
+</html>
+

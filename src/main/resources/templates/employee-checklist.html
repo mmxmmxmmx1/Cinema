@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${title}">更新影廳檢查表</title>
+    <style>
+        body { font-family: "Noto Sans TC", "Segoe UI", Arial, sans-serif; margin: 0; background: #0f1424; color: #f8f9ff; }
+        header { padding: 28px 38px; background: linear-gradient(135deg, #26304f, #1d263d); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); }
+        h1 { margin: 0; font-size: 26px; }
+        p { margin: 8px 0 0; color: #cfe0ff; }
+        main { padding: 28px 38px; max-width: 1400px; margin: 0 auto; display: grid; gap: 16px; }
+        section { background: rgba(255, 255, 255, 0.04); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1); padding: 18px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); text-align: left; vertical-align: middle; }
+        th { color: #9ad0ff; background: rgba(154, 208, 255, 0.08); font-weight: 700; }
+        input[type="text"] { width: 96%; max-width: 460px; background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 6px; color: #fff; padding: 7px 9px; }
+        input[type="checkbox"] { width: 18px; height: 18px; }
+        .btn { background: #3b7ddd; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; }
+        .btn:hover { background: #5390ff; }
+        .muted { color: #9ab0d1; font-size: 13px; }
+        .flash-ok { color: #b9ffda; }
+        .flash-err { color: #ffb1b1; }
+        a { color: #8ec7ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .actions { display: flex; align-items: center; gap: 14px; margin-top: 12px; flex-wrap: wrap; }
+        .btn-secondary { background: #4d5f8f; }
+        .btn-secondary:hover { background: #5d73ab; }
+    </style>
+</head>
+<body>
+<header>
+    <h1 th:text="${title}">更新影廳檢查表</h1>
+    <p th:text="${'檢查日期：' + checkDate + ' · 操作人員：' + operator}">檢查日期：2026-02-11 · 操作人員：emp01</p>
+</header>
+
+<main>
+    <section th:if="${success}" class="flash-ok" th:text="${success}">儲存成功</section>
+    <section th:if="${error}" class="flash-err" th:text="${error}">儲存失敗</section>
+
+    <section>
+        <form method="get" action="/employee/checklist" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <label for="check-date">檢查日期</label>
+            <input id="check-date" name="date" type="date" th:value="${checkDate}" th:max="${maxCheckDate}" style="max-width: 220px;">
+            <button type="submit" class="btn">切換日期</button>
+        </form>
+    </section>
+
+    <section>
+        <h2>完成率</h2>
+        <div class="member-meta" th:if="${hallCompletion == null || #lists.isEmpty(hallCompletion)}">暫無統計資料</div>
+        <table th:if="${hallCompletion != null && !#lists.isEmpty(hallCompletion)}">
+            <thead>
+            <tr>
+                <th>影廳</th>
+                <th>完成項目</th>
+                <th>完成率</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="s : ${hallCompletion}">
+                <td th:text="${s.auditorium}">1號廳</td>
+                <td th:text="${s.checked + ' / ' + s.total}">4 / 5</td>
+                <td th:text="${s.completionRate + '%'}">80%</td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section>
+        <form method="post" action="/employee/checklist" th:object="${form}">
+            <input type="hidden" th:name="${_csrf != null ? _csrf.parameterName : '_csrf'}" th:value="${_csrf != null ? _csrf.token : ''}">
+            <input type="hidden" th:field="*{checkDate}">
+
+            <table>
+                <thead>
+                <tr>
+                    <th>影廳</th>
+                    <th>檢查項目</th>
+                    <th>完成</th>
+                    <th>備註</th>
+                    <th>最後更新</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:if="${entries == null || #lists.isEmpty(entries)}">
+                    <td colspan="5" class="muted">目前沒有可用的影廳資料。</td>
+                </tr>
+                <tr th:each="entry, stat : ${entries}">
+                    <td>
+                        <span th:text="${entry.auditorium}">1號廳</span>
+                        <input type="hidden" th:name="${'entries[' + stat.index + '].auditorium'}" th:value="${entry.auditorium}">
+                        <input type="hidden" th:name="${'entries[' + stat.index + '].itemCode'}" th:value="${entry.itemCode}">
+                        <input type="hidden" th:name="${'entries[' + stat.index + '].itemLabel'}" th:value="${entry.itemLabel}">
+                    </td>
+                    <td th:text="${entry.itemLabel}">螢幕與投影</td>
+                    <td>
+                        <input type="checkbox" class="check-item"
+                               th:name="${'entries[' + stat.index + '].checked'}" value="true"
+                               th:checked="${entry.checked}">
+                    </td>
+                    <td>
+                        <input type="text" maxlength="255" placeholder="可填寫問題或補充說明"
+                               th:name="${'entries[' + stat.index + '].note'}"
+                               th:value="${entry.note}">
+                    </td>
+                    <td class="muted" th:text="${#strings.isEmpty(entry.updatedAt) ? '-' : (entry.updatedAt + ' · ' + entry.updatedBy)}">-</td>
+                </tr>
+                </tbody>
+            </table>
+
+            <div class="actions">
+                <button type="button" class="btn btn-secondary" id="check-all-btn">全部勾選</button>
+                <button type="button" class="btn btn-secondary" id="uncheck-all-btn">全部取消</button>
+                <button type="submit" class="btn">儲存檢查表</button>
+                <a href="/employee">返回員工首頁</a>
+                <a href="/">回到網站首頁</a>
+            </div>
+        </form>
+    </section>
+
+    <section>
+        <h2>近期歷史（14 天）</h2>
+        <div class="member-meta" th:if="${historyRows == null || #lists.isEmpty(historyRows)}">目前沒有歷史資料</div>
+        <table th:if="${historyRows != null && !#lists.isEmpty(historyRows)}">
+            <thead>
+            <tr>
+                <th>日期</th>
+                <th>影廳</th>
+                <th>完成率</th>
+                <th>責任人</th>
+                <th>最後更新</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="h : ${historyRows}">
+                <td th:text="${h.checkDate}">2026-02-12</td>
+                <td th:text="${h.auditorium}">1號廳</td>
+                <td th:text="${h.completionRate + '% (' + h.checked + '/' + h.total + ')'}">80% (4/5)</td>
+                <td th:text="${#strings.isEmpty(h.latestBy) ? '-' : h.latestBy}">emp01</td>
+                <td th:text="${#strings.isEmpty(h.latestAt) ? '-' : h.latestAt}">2026-02-12 16:30</td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+</main>
+<script>
+    (function() {
+        const checkAllBtn = document.getElementById('check-all-btn');
+        const uncheckAllBtn = document.getElementById('uncheck-all-btn');
+        if (!checkAllBtn && !uncheckAllBtn) return;
+
+        function setAll(value) {
+            const checkboxes = document.querySelectorAll('.check-item');
+            checkboxes.forEach(function(cb) {
+                cb.checked = value;
+            });
+        }
+
+        if (checkAllBtn) {
+            checkAllBtn.addEventListener('click', function() {
+                setAll(true);
+            });
+        }
+        if (uncheckAllBtn) {
+            uncheckAllBtn.addEventListener('click', function() {
+                setAll(false);
+            });
+        }
+    })();
+</script>
+</body>
+</html>

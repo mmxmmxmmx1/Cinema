@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${title}">管理員：角色管理</title>
+    <style>
+        body { font-family: "Noto Sans TC", "Segoe UI", Arial, sans-serif; margin: 0; background: #0f1626; color: #f4f6ff; }
+        header { padding: 30px 44px; background: linear-gradient(135deg, #2d3c68, #1c2642); box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45); }
+        h1 { margin: 0; font-size: 26px; }
+        main { padding: 36px 44px; display: grid; gap: 18px; max-width: 1400px; margin: 0 auto; }
+        section { background: rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 22px; border: 1px solid rgba(255, 255, 255, 0.08); }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        th, td { padding: 10px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); text-align: left; }
+        th { color: #9ad0ff; font-weight: 600; }
+        .notice { padding: 12px 14px; border-radius: 12px; font-size: 14px; }
+        .success { background: rgba(99, 230, 190, 0.12); border: 1px solid rgba(99, 230, 190, 0.4); color: #c8fff0; }
+        .error { background: rgba(255, 107, 107, 0.14); border: 1px solid rgba(255, 107, 107, 0.4); color: #ffd7d7; }
+        form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: end; }
+        label { display: grid; gap: 8px; font-size: 14px; }
+        select { padding: 12px 12px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.16); background: rgba(255, 255, 255, 0.05); color: #fff; font-size: 14px; outline: none; }
+        button { padding: 12px 18px; border: none; border-radius: 14px; background: linear-gradient(135deg, #2f89ff, #4c9aff); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+        button:hover { filter: brightness(1.05); }
+        a { color: #8ec7ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .footer { display: flex; gap: 14px; align-items: center; }
+    </style>
+</head>
+<body>
+<header>
+    <h1 th:text="${title}">管理員：角色管理</h1>
+    <p>用於 demo：快速切換員工角色（EMPLOYEE / IT / MANAGER / ADMIN）。</p>
+</header>
+<main>
+    <div th:if="${success}" class="notice success" th:text="${success}">success</div>
+    <div th:if="${error}" class="notice error" th:text="${error}">error</div>
+
+    <section>
+        <h2>調整角色</h2>
+        <form method="post" action="/employee/admin/roles">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <label>
+                員工帳號
+                <select name="nickname" required>
+                    <option value="" selected disabled>選擇員工</option>
+                    <option th:each="emp : ${employees}" th:value="${emp.nickname}" th:text="${emp.nickname}">emp01</option>
+                </select>
+            </label>
+            <label>
+                角色
+                <select name="roleCode" required>
+                    <option value="" selected disabled>選擇角色</option>
+                    <option th:each="role : ${roles}" th:value="${role.code}"
+                            th:text="${role.code + ' (level=' + role.level + ')'}">EMPLOYEE</option>
+                </select>
+            </label>
+            <button type="submit">更新</button>
+        </form>
+    </section>
+
+    <section>
+        <h2>員工清單</h2>
+        <table>
+            <thead>
+            <tr>
+                <th>帳號</th>
+                <th>角色</th>
+                <th>Level</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="emp : ${employees}">
+                <td th:text="${emp.nickname}">emp01</td>
+                <td th:text="${emp.role_code}">EMPLOYEE</td>
+                <td th:text="${emp.role_level}">10</td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <div class="footer">
+        <a href="/employee/admin/dashboard">← 回管理中心</a>
+        <a href="/">← 回首頁</a>
+    </div>
+</main>
+</body>
+</html>
+

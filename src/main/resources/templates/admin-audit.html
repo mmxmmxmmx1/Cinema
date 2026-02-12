@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${title}">管理員：稽核監控</title>
+    <style>
+        body { font-family: "Noto Sans TC", "Segoe UI", Arial, sans-serif; margin: 0; background: #0f1428; color: #f3f6ff; }
+        header { padding: 28px 40px; background: linear-gradient(135deg, #263763, #1b2441); }
+        main { padding: 28px 40px; display: grid; gap: 18px; }
+        section { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+        .metric { background: rgba(10, 17, 38, 0.6); border-radius: 10px; padding: 12px; }
+        .metric .label { color: #8fb7ff; font-size: 14px; }
+        .metric .value { font-size: 28px; font-weight: 700; margin-top: 6px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); text-align: left; }
+        th { color: #9ad0ff; }
+        .warn { color: #ffb3b3; }
+        .ok { color: #b4ffcc; }
+        a { color: #9ad0ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+<header>
+    <h1 th:text="${title}">管理員：稽核監控</h1>
+    <p>統計區間：最近 <strong th:text="${hours}">24</strong> 小時</p>
+</header>
+<main>
+    <section th:if="${error}">
+        <div class="warn" th:text="${error}">資料庫尚未就緒</div>
+    </section>
+
+    <section>
+        <h2>總覽</h2>
+        <div class="grid">
+            <div class="metric">
+                <div class="label">總事件數</div>
+                <div class="value" th:text="${totalEvents}">0</div>
+            </div>
+            <div class="metric">
+                <div class="label">失敗事件</div>
+                <div class="value warn" th:text="${failedEvents}">0</div>
+            </div>
+            <div class="metric">
+                <div class="label">付款失敗</div>
+                <div class="value warn" th:text="${paymentFailures}">0</div>
+            </div>
+            <div class="metric">
+                <div class="label">取消訂單數</div>
+                <div class="value ok" th:text="${cancellationCount}">0</div>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>動作統計</h2>
+        <table>
+            <thead>
+            <tr>
+                <th>Action</th>
+                <th>Result</th>
+                <th>Count</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:if="${actionStats == null || #lists.isEmpty(actionStats)}">
+                <td colspan="3">目前沒有資料</td>
+            </tr>
+            <tr th:each="row : ${actionStats}">
+                <td th:text="${row.action}">ORDER_PAY</td>
+                <td th:text="${row.result}" th:classappend="${row.result != 'SUCCESS'} ? 'warn' : 'ok'">SUCCESS</td>
+                <td th:text="${row.cnt}">0</td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section>
+        <h2>近期失敗事件</h2>
+        <table>
+            <thead>
+            <tr>
+                <th>時間</th>
+                <th>Actor</th>
+                <th>Action</th>
+                <th>Target</th>
+                <th>Result</th>
+                <th>Detail</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:if="${recentFailures == null || #lists.isEmpty(recentFailures)}">
+                <td colspan="6">最近沒有失敗事件</td>
+            </tr>
+            <tr th:each="row : ${recentFailures}">
+                <td th:text="${row.created_at}">2026-02-12 09:00:00</td>
+                <td th:text="${row.actor_type + ':' + row.actor_id}">MEMBER:1</td>
+                <td th:text="${row.action}">ORDER_PAY</td>
+                <td th:text="${row.target_type + ':' + row.target_id}">ORDER:12</td>
+                <td class="warn" th:text="${row.result}">FAILED</td>
+                <td th:text="${row.detail}">timeout-before-payment</td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section>
+        <a href="/employee/admin/dashboard">← 回管理後台</a>
+    </section>
+</main>
+</body>
+</html>

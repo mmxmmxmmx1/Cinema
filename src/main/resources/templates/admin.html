@@ -86,10 +86,21 @@
             <li>新員工教育訓練簡報已上傳至知識庫。</li>
         </ul>
     </section>
-    <form class="logout" method="post" action="/logout">
+    <section>
+        <h2>快速管理</h2>
+        <ul>
+            <li><a href="/employee/admin/roles">角色管理（demo）</a></li>
+            <li><a href="/employee/admin/showtimes">場次管理（新增/停用）</a></li>
+            <li><a href="/employee/admin/audit">稽核監控（最近 24 小時）</a></li>
+        </ul>
+    </section>
+    <form class="logout" method="post" action="/employee/logout">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
         <button type="submit">登出管理者帳號</button>
     </form>
-    <form id="admin-auto-logout" method="post" action="/logout" style="display: none;"></form>
+    <form id="admin-auto-logout" method="post" action="/employee/logout" style="display: none;">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+    </form>
     <a href="/">← 回首頁</a>
 </main>
 <script>
@@ -125,13 +136,13 @@
             lastHeartbeat = now;
             if (navigator.sendBeacon) {
                 try {
-                    navigator.sendBeacon('/admin/activity', new Blob([], { type: 'text/plain' }));
+                    navigator.sendBeacon('/employee/admin/activity', new Blob([], { type: 'text/plain' }));
                     return;
                 } catch (err) {
                     // ignore
                 }
             }
-            fetch('/admin/activity', { method: 'POST', keepalive: true }).catch(function() {});
+            fetch('/employee/admin/activity', { method: 'POST', keepalive: true }).catch(function() {});
         }
 
         events.forEach(function(evt) {

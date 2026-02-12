@@ -61,10 +61,13 @@
             [2025-10-11 11:35:02] INFO  SecurityAudit - Admin role review completed without anomalies.<br>
         </div>
     </section>
-    <form method="post" action="/logout">
+    <form method="post" action="/employee/logout">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
         <button type="submit">登出 IT 帳號</button>
     </form>
-    <form id="it-auto-logout" method="post" action="/logout" style="display: none;"></form>
+    <form id="it-auto-logout" method="post" action="/employee/logout" style="display: none;">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+    </form>
     <a href="/">← 回首頁</a>
 </main>
 <script>
@@ -100,13 +103,13 @@
             lastHeartbeat = now;
             if (navigator.sendBeacon) {
                 try {
-                    navigator.sendBeacon('/it/activity', new Blob([], { type: 'text/plain' }));
+                    navigator.sendBeacon('/employee/it/activity', new Blob([], { type: 'text/plain' }));
                     return;
                 } catch (err) {
                     // ignore
                 }
             }
-            fetch('/it/activity', { method: 'POST', keepalive: true }).catch(function() {});
+            fetch('/employee/it/activity', { method: 'POST', keepalive: true }).catch(function() {});
         }
 
         events.forEach(function(evt) {
