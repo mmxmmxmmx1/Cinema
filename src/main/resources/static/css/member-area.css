@@ -1,0 +1,186 @@
+/* Shared styles for member-area Thymeleaf pages: /member, /member/orders, /member/orders/{id} */
+
+:root {
+  --member-bg: #101223;
+  --member-fg: #f4f4f8;
+  --member-muted: #b9bedb;
+  --member-link: #9ad0ff;
+  --member-card: rgba(13, 19, 43, 0.6);
+  --member-card-border: rgba(255, 255, 255, 0.08);
+  --member-header-a: #1f2240;
+  --member-header-b: #2f335d;
+  --member-btn: #3b7ddd;
+  --member-btn-hover: #5390ff;
+}
+
+body.member-area {
+  font-family: "Noto Sans TC", "Segoe UI", Arial, sans-serif;
+  margin: 0;
+  background: var(--member-bg);
+  color: var(--member-fg);
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.member-header {
+  padding: 32px 48px;
+  background: linear-gradient(135deg, var(--member-header-a), var(--member-header-b));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.member-header h1 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.member-header .member-subtitle {
+  margin: 10px 0 0 0;
+  color: var(--member-muted);
+}
+
+.member-main {
+  padding: 40px 48px;
+  display: grid;
+  gap: 24px;
+}
+
+.member-card {
+  background: var(--member-card);
+  border: 1px solid var(--member-card-border);
+  padding: 20px;
+  border-radius: 14px;
+}
+
+.member-card h2 {
+  margin: 0 0 14px;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--member-fg);
+}
+
+.member-card p,
+.member-card li,
+.member-card div:not(.member-meta):not(.member-order-meta) {
+  font-size: 1.05rem;
+  color: var(--member-fg);
+}
+
+.member-meta {
+  color: var(--member-muted);
+  font-size: 14px;
+}
+
+.member-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.member-list li {
+  display: grid;
+  gap: 6px;
+}
+
+.member-row {
+  align-items: baseline;
+}
+
+.member-order-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.member-order-primary {
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: var(--member-fg);
+}
+
+.member-order-secondary {
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--member-fg);
+}
+
+.member-order-meta {
+  font-size: 1.05rem;
+  color: var(--member-muted);
+}
+
+a.member-link,
+.member-main a {
+  color: var(--member-link);
+  text-decoration: none;
+}
+
+a.member-link:hover,
+.member-main a:hover {
+  text-decoration: underline;
+}
+
+.member-actions {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.member-btn {
+  background: var(--member-btn);
+  color: #fff;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 20px;
+  cursor: pointer;
+}
+
+.member-btn:hover {
+  background: var(--member-btn-hover);
+}
+
+.member-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(74, 144, 226, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e8f0ff;
+  font-size: 12px;
+}
+
+.member-grid {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.member-flash {
+  padding: 12px 14px;
+  border-radius: 12px;
+}
+
+.member-flash.error {
+  background: rgba(255, 107, 107, 0.18);
+  border: 1px solid rgba(255, 107, 107, 0.5);
+  color: #ffd7d7;
+}
+
+.member-danger {
+  background: rgba(255, 107, 107, 0.18);
+  border: 1px solid rgba(255, 107, 107, 0.55);
+  color: #ffd7d7;
+}
+
+.member-danger:hover {
+  background: rgba(255, 107, 107, 0.26);
+}
+
+@media (max-width: 720px) {
+  .member-header { padding: 22px 18px; }
+  .member-header h1 { font-size: 22px; }
+  .member-main { padding: 22px 18px; }
+  .member-grid { grid-template-columns: 96px 1fr; }
+}

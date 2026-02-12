@@ -3,46 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <title th:text="${title}">會員專屬頁面</title>
-    <style>
-        body { font-family: "Noto Sans TC", "Segoe UI", Arial, sans-serif; margin: 0; background: #101223; color: #f4f4f8; }
-        header { padding: 32px 48px; background: linear-gradient(135deg, #1f2240, #2f335d); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); }
-        h1 { margin: 0; font-size: 28px; }
-        main { padding: 40px 48px; display: grid; gap: 24px; }
-        section { background: rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 24px; backdrop-filter: blur(6px); }
-        a { color: #9ad0ff; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .actions { display: flex; gap: 16px; flex-wrap: wrap; }
-        .card { background: rgba(13, 19, 43, 0.6); padding: 20px; border-radius: 14px; }
-        button { background: #3b7ddd; color: #fff; border: none; padding: 10px 24px; border-radius: 20px; cursor: pointer; }
-        button:hover { background: #5390ff; }
-        .logout-form { display: inline; }
-    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/member-area.css">
 </head>
-<body>
-<header>
+<body class="member-area">
+<header class="member-header">
     <h1 th:text="${title}">很好睡電影院會員專區</h1>
-    <p th:text="${message}">歡迎回來！查看您的專屬優惠與即將到來的電影體驗。</p>
+    <p class="member-subtitle" th:text="${message}">歡迎回來！查看您的專屬優惠與即將到來的電影體驗。</p>
 </header>
-<main>
-    <section class="card">
+<main class="member-main">
+    <section class="member-card">
         <h2>紅利點數</h2>
-        <p>目前累積：<strong>12,450 點</strong></p>
-        <div class="actions">
-            <button type="button">兌換專屬禮遇</button>
-            <button type="button">查看點數紀錄</button>
+        <p>目前累積：<strong th:text="${(memberPoints != null ? #numbers.formatInteger(memberPoints, 1, 'COMMA') : '0') + ' 點'}">0 點</strong></p>
+        <div class="member-actions">
+            <a class="member-btn" href="/member/points">查看點數紀錄</a>
         </div>
     </section>
-    <section class="card">
+    <section class="member-card">
         <h2>即將欣賞的電影</h2>
-        <ul>
-            <li>沙丘：第二部 — 12/08 18:40 — 1 號廳</li>
-            <li>奧本海默 — 12/12 20:10 — 2 號廳</li>
+        <div class="member-meta" th:if="${upcomingBookings == null || #lists.isEmpty(upcomingBookings)}">
+            目前沒有即將開演的場次
+        </div>
+        <ul class="member-list" th:if="${upcomingBookings != null && !#lists.isEmpty(upcomingBookings)}">
+            <li class="member-row" th:each="b : ${upcomingBookings}">
+                <span class="member-order-primary" th:text="${b.movieTitle}">電影名稱</span>
+                <span class="member-order-secondary" th:text="${' · ' + b.showStartLabel + ' · ' + b.auditorium}"> · 02/11 18:40 · 1號廳</span>
+                <span class="member-meta" th:text="${'（' + b.ticketCount + ' 張）'}">（2 張）</span>
+            </li>
         </ul>
     </section>
-    <form class="logout-form" method="post" action="/member/logout">
-        <button type="submit">登出會員</button>
+
+    <section class="member-card">
+        <h2>我的訂單</h2>
+        <p th:if="${orderLoadError != null}" th:text="${orderLoadError}" style="color:#ff9a9a;">無法載入訂單</p>
+        <div class="member-meta" th:if="${activeOrders == null || #lists.isEmpty(activeOrders)}">
+            目前沒有即將開演或正在播放的訂單
+        </div>
+        <ul class="member-list" th:if="${activeOrders != null && !#lists.isEmpty(activeOrders)}">
+            <li class="member-row" th:each="o : ${activeOrders}">
+                <a th:href="@{/member/orders/{orderId}(orderId=${o.orderId})}">
+                    <strong th:text="${'#' + o.orderId}">#1</strong>
+                </a>
+                <span class="member-order-secondary" th:text="${' · ' + (o.showStartAt != null ? #temporals.format(o.showStartAt, 'MM/dd HH:mm') : '--/-- --:--') + ' · ' + o.auditorium}"> · 02/11 18:40 · 1 號廳</span>
+                <span class="member-meta" th:text="${o.status + ' · ' + o.totalQty + ' 張 · $' + o.totalPrice}">PAID · 2 張 · $600</span>
+            </li>
+        </ul>
+        <div class="member-actions" style="margin-top: 14px;">
+            <a href="/member/orders">查看全部訂單</a>
+        </div>
+    </section>
+
+    <section class="member-card">
+        <h2>歷史訂單</h2>
+        <div class="member-meta" th:if="${historyOrders == null || #lists.isEmpty(historyOrders)}">
+            目前沒有已播畢的已付款訂單
+        </div>
+        <ul class="member-list" th:if="${historyOrders != null && !#lists.isEmpty(historyOrders)}">
+            <li class="member-row" th:each="o : ${historyOrders}">
+                <a th:href="@{/member/orders/{orderId}(orderId=${o.orderId})}">
+                    <strong th:text="${'#' + o.orderId}">#1</strong>
+                </a>
+                <span class="member-order-secondary" th:text="${' · ' + (o.showStartAt != null ? #temporals.format(o.showStartAt, 'MM/dd HH:mm') : '--/-- --:--') + ' · ' + o.auditorium}"> · 02/11 18:40 · 1 號廳</span>
+                <span class="member-meta" th:text="${o.status + ' · ' + o.totalQty + ' 張 · $' + o.totalPrice}">PAID · 2 張 · $600</span>
+            </li>
+        </ul>
+    </section>
+
+    <section class="member-card">
+        <h2>站內通知</h2>
+        <p th:if="${notificationLoadError != null}" th:text="${notificationLoadError}" style="color:#ff9a9a;">無法載入通知</p>
+        <div class="member-meta" th:if="${recentNotifications == null || #lists.isEmpty(recentNotifications)}">
+            目前沒有通知
+        </div>
+        <ul th:if="${recentNotifications != null && !#lists.isEmpty(recentNotifications)}">
+            <li th:each="n : ${recentNotifications}">
+                <strong th:text="${n.title}">通知標題</strong>
+                <span class="member-meta" th:text="${' · ' + n.category}"> · ORDER</span>
+                <div th:text="${n.message}">通知內容</div>
+                <div class="member-meta" th:text="${#temporals.format(n.createdAt, 'yyyy-MM-dd HH:mm')}">2026-01-01 12:00</div>
+            </li>
+        </ul>
+    </section>
+    <form method="post" action="/member/logout">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <button class="member-btn" type="submit">登出會員</button>
     </form>
-    <form id="member-auto-logout" method="post" action="/member/logout" style="display: none;"></form>
+    <form id="member-auto-logout" method="post" action="/member/logout" style="display: none;">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+    </form>
     <a href="/">← 返回首頁</a>
 </main>
 <script>

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${order != null ? '訂單 #' + order.orderId : '訂單'}">訂單</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/member-area.css">
+</head>
+<body class="member-area">
+<header class="member-header">
+    <h1 th:text="${'訂單 #' + order.orderId}">訂單 #1</h1>
+    <div class="member-subtitle" th:text="${order.movieTitle + ' · ' + order.showtimeStartTime + ' · ' + order.auditorium}">
+        電影 · 18:40 · 1 號廳
+    </div>
+</header>
+<main class="member-main">
+    <div th:if="${error}" class="member-card member-danger" th:text="${error}">錯誤</div>
+    <div th:if="${success}" class="member-card" th:text="${success}">成功</div>
+
+    <div class="member-card">
+        <div class="member-grid">
+            <div class="member-meta">狀態</div>
+            <div><span class="member-pill" th:text="${order.status}">PAID</span></div>
+        </div>
+        <div class="member-grid">
+            <div class="member-meta">座位</div>
+            <div th:text="${order.seatIds != null ? #strings.listJoin(order.seatIds, ', ') : ''}">A01, A02</div>
+        </div>
+        <div class="member-grid">
+            <div class="member-meta">張數</div>
+            <div th:text="${order.totalQty}">4</div>
+        </div>
+        <div class="member-grid">
+            <div class="member-meta">票價</div>
+            <div th:text="${'$' + order.unitPrice + ' / 張'}">$300 / 張</div>
+        </div>
+        <div class="member-grid">
+            <div class="member-meta">總價</div>
+            <div th:text="${'$' + order.totalPrice}">$1200</div>
+        </div>
+        <div class="member-grid">
+            <div class="member-meta">建立時間</div>
+            <div th:text="${order.createdAt}">2026-02-10 12:00</div>
+        </div>
+        <div class="member-grid" th:if="${order.paidAt != null && !#strings.isEmpty(order.paidAt)}">
+            <div class="member-meta">付款時間</div>
+            <div th:text="${order.paidAt}">2026-02-10 12:01</div>
+        </div>
+        <div class="member-grid" th:if="${order.cancelledAt != null && !#strings.isEmpty(order.cancelledAt)}">
+            <div class="member-meta">取消時間</div>
+            <div th:text="${order.cancelledAt}">2026-02-10 12:02</div>
+        </div>
+        <div class="member-grid" th:if="${order.failedAt != null && !#strings.isEmpty(order.failedAt)}">
+            <div class="member-meta">失敗時間</div>
+            <div th:text="${order.failedAt}">2026-02-10 12:03</div>
+        </div>
+        <div class="member-grid" th:if="${order.expiredAt != null && !#strings.isEmpty(order.expiredAt)}">
+            <div class="member-meta">失效時間</div>
+            <div th:text="${order.expiredAt}">2026-02-10 12:04</div>
+        </div>
+        <div class="member-grid" th:if="${order.failureReason != null && !#strings.isEmpty(order.failureReason)}">
+            <div class="member-meta">失敗原因</div>
+            <div th:text="${order.failureReason}">PAYMENT_FAILED</div>
+        </div>
+        <div class="member-grid">
+            <div class="member-meta">付款嘗試</div>
+            <div th:text="${order.paymentAttempts}">1</div>
+        </div>
+    </div>
+
+    <div class="member-card">
+        <div class="member-actions">
+            <form th:if="${order.cancellable}" method="post" th:action="@{'/member/orders/' + ${order.orderId} + '/cancel'}">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                <button type="submit" class="member-btn member-danger">取消訂單</button>
+            </form>
+            <span class="member-meta" th:if="${!order.cancellable && order.cancelHint != null && !#strings.isEmpty(order.cancelHint)}"
+                  th:text="${order.cancelHint}">開演前 30 分鐘內不可取消。</span>
+            <a href="/member/orders">← 回訂單列表</a>
+            <a href="/member">回會員專區</a>
+            <a href="/">回到購票首頁</a>
+        </div>
+    </div>
+</main>
+</body>
+</html>

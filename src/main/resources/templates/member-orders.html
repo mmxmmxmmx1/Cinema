@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>我的訂單</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/member-area.css">
+</head>
+<body class="member-area">
+<header class="member-header">
+    <h1>我的訂單</h1>
+    <div class="member-subtitle">在會員專區查看你的訂單紀錄</div>
+</header>
+<main class="member-main">
+    <div th:if="${error}" class="member-flash error" th:text="${error}">無法載入訂單</div>
+    <div th:if="${success}" class="member-card" th:text="${success}">取消成功</div>
+
+    <div class="member-card" th:if="${orders == null || #lists.isEmpty(orders)}">
+        目前沒有訂單。<a href="/">回到首頁</a>
+    </div>
+
+    <ul class="member-list" th:if="${orders != null && !#lists.isEmpty(orders)}">
+        <li class="member-card" th:each="o : ${orders}">
+            <div class="member-order-head">
+                <a th:href="@{'/member/orders/' + ${o.orderId}}">
+                    <strong th:text="${'#' + o.orderId}">#1</strong>
+                </a>
+                <span class="member-pill" th:text="${o.status}">PAID</span>
+            </div>
+            <div class="member-order-primary" th:text="${o.movieTitle + ' · ' + o.showtimeStartTime + ' · ' + o.auditorium}">
+                電影 · 18:40 · 1 號廳
+            </div>
+            <div class="member-order-meta" th:text="${o.totalQty + ' 張 · $' + o.totalPrice + ' · 建立 ' + o.createdAt}">
+                2 張 · $600 · 建立 2026-02-10 12:00
+            </div>
+            <div class="member-order-meta" th:if="${o.paidAt != null && !#strings.isEmpty(o.paidAt)}" th:text="${'付款 ' + o.paidAt}">
+                付款 2026-02-10 12:01
+            </div>
+            <div class="member-actions" style="margin-top: 8px;">
+                <form method="post" th:if="${o.cancellable}" th:action="@{'/member/orders/' + ${o.orderId} + '/cancel'}">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                    <button type="submit" class="member-btn member-danger">取消訂單</button>
+                </form>
+                <span class="member-meta" th:if="${!o.cancellable && o.cancelHint != null && !#strings.isEmpty(o.cancelHint)}"
+                      th:text="${o.cancelHint}">開演前 30 分鐘內不可取消。</span>
+            </div>
+        </li>
+    </ul>
+
+    <div class="member-card">
+        <a href="/member">← 回會員專區</a>
+        <span style="margin-left: 12px;"></span>
+        <a href="/">回到購票首頁</a>
+    </div>
+</main>
+</body>
+</html>

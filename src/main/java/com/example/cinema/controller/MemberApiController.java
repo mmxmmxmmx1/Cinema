@@ -4,8 +4,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.example.cinema.dto.AuthStatusResponse;
 import com.example.cinema.dto.MemberBooking;
 import com.example.cinema.dto.MemberSummary;
+import com.example.cinema.service.MemberLoyaltyService;
+import com.example.cinema.service.MemberOrderService;
 import com.example.cinema.service.SessionService;
 import com.example.cinema.service.SessionService.Realm;
 
@@ -13,6 +16,9 @@ import jakarta.servlet.http.HttpSession;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,11 +28,41 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api")
 public class MemberApiController {
-
+	
     private final SessionService sessionService;
-
-    public MemberApiController(SessionService sessionService) {
+    private final MemberLoyaltyService memberLoyaltyService;
+    private final MemberOrderService memberOrderService;
+	
+    public MemberApiController(
+            SessionService sessionService,
+            MemberLoyaltyService memberLoyaltyService,
+            MemberOrderService memberOrderService) {
         this.sessionService = sessionService;
+        this.memberLoyaltyService = memberLoyaltyService;
+        this.memberOrderService = memberOrderService;
+    }
+
+    @GetMapping("/auth/member")
+    public ResponseEntity<AuthStatusResponse> memberAuth(Authentication authentication) {
+        boolean loggedIn = authentication != null
+                && authentication.isAuthenticated()
+                && !(authentication instanceof AnonymousAuthenticationToken);
+
+        Set<String> authorities = loggedIn
+                ? authentication.getAuthorities().stream().map(GrantedAuthority::getAuthority).collect(java.util.stream.Collectors.toSet())
+                : Set.of();
+
+        boolean isMember = authorities.contains("ROLE_MEMBER");
+        boolean isEmployee = authorities.contains("ROLE_EMPLOYEE")
+                || authorities.contains("ROLE_IT")
+                || authorities.contains("ROLE_MANAGER")
+                || authorities.contains("ROLE_ADMIN");
+
+        String username = loggedIn ? authentication.getName() : null;
+        List<String> roles = authorities.stream().sorted().toList();
+
+        // Backward compatibility: `authenticated` means "logged in as MEMBER".
+        return ResponseEntity.ok(new AuthStatusResponse(isMember, username, isMember, isEmployee, roles));
     }
 
     @PostMapping("/guest/watchlist/{movieId}")
@@ -52,16 +88,17 @@ public class MemberApiController {
     }
 
     @GetMapping("/member/summary")
-    public ResponseEntity<MemberSummary> summary(HttpSession session) {
+    public ResponseEntity<MemberSummary> summary(HttpSession session, Authentication authentication) {
         if (!sessionService.isAuthenticated(session, Realm.MEMBER)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        MemberSummary summary = new MemberSummary(
-                12450,
-                List.of(
-                        new MemberBooking("Dune: Part Two", "12/08 18:40", "1 號廳"),
-                        new MemberBooking("Oppenheimer", "12/12 20:10", "2 號廳")));
+        String username = authentication == null ? null : authentication.getName();
+        int points = memberLoyaltyService.currentPoints(username);
+        List<MemberBooking> bookings = memberOrderService.listUpcomingBookings(username, 5).stream()
+                .map(b -> new MemberBooking(b.movieTitle(), b.showStartLabel(), b.auditorium()))
+                .toList();
+        MemberSummary summary = new MemberSummary(points, bookings);
         return ResponseEntity.ok(summary);
     }
 }
