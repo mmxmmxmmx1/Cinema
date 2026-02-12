@@ -41,8 +41,14 @@
         </div>
     </div>
 
-    <form method="post" action="/login">`n        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-        <input th:if="${target}" type="hidden" name="target" th:value="${target}">
+    <form method="post" th:action="${formAction}">
+        <!-- In some MVC tests the Spring Security CsrfToken isn't present; render safely. -->
+        <th:block th:if="${_csrf != null}">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        </th:block>
+        <th:block th:if="${returnTo}">
+            <input type="hidden" name="returnTo" th:value="${returnTo}">
+        </th:block>
         <label>
             帳號
             <input type="text" name="username" placeholder="輸入帳號" autocomplete="username" required>
@@ -55,6 +61,9 @@
     </form>
 
     <div class="back-home"><a href="/">← 回到首頁</a></div>
+    <div class="back-home" style="margin-top: -12px;">
+        <a href="/login?target=member">會員登入</a> · <a href="/login?target=employee">員工登入</a>
+    </div>
 </div>
 <script th:if="${lockSeconds}">
     (function() {

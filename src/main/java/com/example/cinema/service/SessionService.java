@@ -10,6 +10,8 @@ import jakarta.servlet.http.HttpSession;
 
 import org.springframework.stereotype.Service;
 
+import com.example.cinema.config.AppClock;
+
 @Service
 public class SessionService {
 
@@ -64,7 +66,7 @@ public class SessionService {
     }
 
     public void updateLastActivity(HttpSession session, Realm realm) {
-        session.setAttribute(keys(realm).lastActivityKey, Instant.now());
+        session.setAttribute(keys(realm).lastActivityKey, AppClock.nowInstant());
     }
 
     public boolean isSessionExpired(HttpSession session, Realm realm, Duration timeout) {
@@ -73,7 +75,7 @@ public class SessionService {
         if (lastActivity == null || timeout == null || timeout.isZero() || timeout.isNegative()) {
             return false;
         }
-        return lastActivity.plus(timeout).isBefore(Instant.now());
+        return lastActivity.plus(timeout).isBefore(AppClock.nowInstant());
     }
 
     public void resetAttempts(HttpSession session, Realm realm) {
@@ -88,7 +90,7 @@ public class SessionService {
 
         if (status.locked()) {
             session.removeAttribute(keys.attemptCountKey);
-            Instant lockUntil = Instant.now().plus(status.lockDuration());
+            Instant lockUntil = AppClock.nowInstant().plus(status.lockDuration());
             session.setAttribute(keys.lockUntilKey, lockUntil);
             session.setAttribute(keys.errorMessageKey, formatLockMessage(status.lockDuration()));
         } else {
@@ -106,12 +108,12 @@ public class SessionService {
 
     public Duration remainingLockDuration(HttpSession session, Realm realm) {
         Instant lockUntil = (Instant) session.getAttribute(keys(realm).lockUntilKey);
-        if (lockUntil == null || lockUntil.isBefore(Instant.now())) {
+        if (lockUntil == null || lockUntil.isBefore(AppClock.nowInstant())) {
             session.removeAttribute(keys(realm).lockUntilKey);
             session.removeAttribute(keys(realm).attemptCountKey);
             return Duration.ZERO;
         }
-        return Duration.between(Instant.now(), lockUntil);
+        return Duration.between(AppClock.nowInstant(), lockUntil);
     }
 
     public String consumeErrorMessage(HttpSession session, Realm realm) {

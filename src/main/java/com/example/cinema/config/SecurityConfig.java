@@ -14,11 +14,14 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.authentication.LockedException;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.InvalidCsrfTokenException;
+import org.springframework.security.web.csrf.MissingCsrfTokenException;
 
 import com.example.cinema.dao.UserDao;
 import com.example.cinema.model.User;
@@ -27,10 +30,42 @@ import com.example.cinema.service.SessionService;
 import com.example.cinema.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpServletResponse;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.web.csrf.CsrfException;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    private static final String STANDARD_CSP = String.join("; ",
+            "default-src 'self'",
+            "img-src 'self' https: data:",
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+            "font-src 'self' https://fonts.gstatic.com data:",
+            "script-src 'self' 'unsafe-inline' https://unpkg.com",
+            "connect-src 'self'",
+            "object-src 'none'",
+            "base-uri 'self'",
+            "frame-ancestors 'self'",
+            "form-action 'self'");
+
+    // The SPA uses Vue templates defined as strings in JS, which requires runtime compilation.
+    // Vue's runtime compiler relies on `new Function(...)` (blocked by CSP unless 'unsafe-eval' is allowed).
+    // Keep this relaxed CSP scoped to the public SPA pages only.
+    private static final String SPA_CSP = String.join("; ",
+            "default-src 'self'",
+            "img-src 'self' https: data:",
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+            "font-src 'self' https://fonts.gstatic.com data:",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com",
+            "connect-src 'self'",
+            "object-src 'none'",
+            "base-uri 'self'",
+            "frame-ancestors 'self'",
+            "form-action 'self'");
 
     private final UserDao userDao;
     private final SessionService sessionService;
@@ -50,6 +85,16 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+    }
+
+    @Bean
+    public CookieCsrfTokenRepository csrfTokenRepository() {
+        CookieCsrfTokenRepository repo = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        // Force a site-wide cookie path so /api/csrf and /member/api/** share the same token cookie.
+        repo.setCookiePath("/");
+        repo.setCookieName("XSRF-TOKEN");
+        repo.setHeaderName("X-XSRF-TOKEN");
+        return repo;
     }
 
     @Bean
@@ -88,7 +133,19 @@ public class SecurityConfig {
                         .requestMatchers("/employee/**").hasAnyRole("EMPLOYEE", "IT", "MANAGER", "ADMIN")
                         .anyRequest().authenticated())
 
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/employee/**"))
+                // Keep CSRF enabled for employee pages. Only ignore heartbeat endpoints.
+                .csrf(csrf -> csrf.ignoringRequestMatchers(
+                        // Allow POST logout without requiring a CSRF token for demo ergonomics.
+                        "/employee/logout",
+                        "/employee/activity",
+                        "/employee/it/activity",
+                        "/employee/manager/activity",
+                        "/employee/admin/activity"))
+                .headers(headers -> headers
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(STANDARD_CSP))
+                        .frameOptions(frame -> frame.sameOrigin())
+                        .referrerPolicy(ref -> ref.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                        .permissionsPolicy(policy -> policy.policy("camera=(), microphone=(), geolocation=()")))
                 .formLogin(login -> login
                         .loginPage("/employee/login").permitAll()
                         .loginProcessingUrl("/employee/login")
@@ -98,7 +155,8 @@ public class SecurityConfig {
 
                             boolean exists = false;
                             if (username != null && !username.isBlank()) {
-                                exists = userDao.findByUsername(username.trim()).isPresent();
+                                // Employee realm should only check the employee table to avoid mixing member accounts.
+                                exists = userDao.findEmployeeByUsername(username.trim()).isPresent();
                             }
 
                             String attemptKey = exists ? username : clientIp;
@@ -171,28 +229,59 @@ public class SecurityConfig {
                         .requestMatchers("/member/login", "/member/login/").permitAll()
                         .requestMatchers("/member/**").hasRole("MEMBER")
                         .anyRequest().authenticated())
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/member/**"))
+                .exceptionHandling(ex -> ex.accessDeniedHandler((request, response, accessDeniedException) -> {
+                    if (request.getRequestURI() != null && request.getRequestURI().startsWith("/member/api/")) {
+                        String message;
+                        if (accessDeniedException instanceof MissingCsrfTokenException) {
+                            message = "缺少 CSRF token，請重新整理頁面後再試。";
+                        } else if (accessDeniedException instanceof InvalidCsrfTokenException) {
+                            message = "CSRF token 不一致或已過期，請重新整理頁面後再試。";
+                        } else if (accessDeniedException instanceof CsrfException) {
+                            message = "CSRF 驗證失敗，請重新整理頁面後再試。";
+                        } else {
+                            message = "沒有會員權限，請確認已使用會員帳號登入。";
+                        }
+                        writeJsonError(response, HttpStatus.FORBIDDEN, message);
+                        return;
+                    }
+                    response.sendError(HttpStatus.FORBIDDEN.value(), "Forbidden");
+                }))
+                // Keep CSRF enabled for member pages. Only ignore the heartbeat endpoint.
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(csrfTokenRepository())
+                        .ignoringRequestMatchers(
+                                // Allow POST logout without requiring a CSRF token for demo ergonomics.
+                                "/member/logout",
+                                "/member/activity"))
+                .headers(headers -> headers
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(STANDARD_CSP))
+                        .frameOptions(frame -> frame.sameOrigin())
+                        .referrerPolicy(ref -> ref.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                        .permissionsPolicy(policy -> policy.policy("camera=(), microphone=(), geolocation=()")))
                 .formLogin(login -> login
                         .loginPage("/member/login").permitAll()
                         .loginProcessingUrl("/member/login")
                         .failureHandler((request, response, exception) -> {
                             String username = request.getParameter("username");
                             String clientIp = getClientIp(request);
+                            String returnTo = request.getParameter("returnTo");
 
                             boolean exists = false;
                             if (username != null && !username.isBlank()) {
-                                exists = userDao.findByUsername(username.trim()).isPresent();
+                                // Member realm should only check the member table to avoid mixing employee accounts.
+                                exists = userDao.findMemberByUsername(username.trim()).isPresent();
                             }
 
                             String attemptKey = exists ? username : clientIp;
                             var status = loginAttemptService.registerFailure(SessionService.Realm.MEMBER, attemptKey);
                             HttpSession session = request.getSession(true);
                             sessionService.applyFailureFeedback(session, SessionService.Realm.MEMBER, status);
-                            response.sendRedirect("/member/login?error");
+                            response.sendRedirect(withReturnTo("/member/login?error", returnTo));
                         })
                         .successHandler((request, response, authentication) -> {
                             String username = authentication.getName();
                             String clientIp = getClientIp(request);
+                            String returnTo = request.getParameter("returnTo");
 
                             // ✅ 帳號鎖定檢查已移至 userDetailsService()，這裡只檢查 IP 鎖定
                             // 檢查 IP 是否被鎖定
@@ -201,7 +290,7 @@ public class SecurityConfig {
                                 HttpSession session = request.getSession(true);
                                 sessionService.applyFailureFeedback(session, SessionService.Realm.MEMBER, ipStatus);
                                 SecurityContextHolder.clearContext();
-                                response.sendRedirect("/member/login?error");
+                                response.sendRedirect(withReturnTo("/member/login?error", returnTo));
                                 return;
                             }
 
@@ -211,7 +300,8 @@ public class SecurityConfig {
                             sessionService.establishSession(session, SessionService.Realm.MEMBER);
                             sessionService.resetAttempts(session, SessionService.Realm.MEMBER);
                             handleMemberPostLogin(session, authentication);
-                            response.sendRedirect("/member");
+                            String safeReturnTo = sanitizeReturnTo(returnTo);
+                            response.sendRedirect(safeReturnTo != null ? safeReturnTo : "/member");
                         }))
                 .logout(logout -> logout
                         .logoutUrl("/member/logout")
@@ -235,25 +325,81 @@ public class SecurityConfig {
                         "/css/**", "/js/**", "/images/**", "/favicon.ico",
                         "/webjars/**", "/assets/**")
                 .permitAll()
+                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/csrf").permitAll()
                 .requestMatchers("/api/guest/**", "/api/movies/**").permitAll()
                 .requestMatchers("/movies/**").permitAll() // 加這行
                 .anyRequest().authenticated())
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**", "/api/guest/**"));
+                // Only ignore CSRF for guest APIs used by the SPA without a token.
+                // Keep CSRF enabled elsewhere to avoid widening the attack surface.
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(csrfTokenRepository())
+                        .ignoringRequestMatchers("/api/guest/**"));
+
+        http.headers(headers -> headers
+                .contentSecurityPolicy(csp -> csp.policyDirectives(SPA_CSP))
+                .frameOptions(frame -> frame.sameOrigin())
+                .referrerPolicy(ref -> ref.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                .permissionsPolicy(policy -> policy.policy("camera=(), microphone=(), geolocation=()")));
         return http.build();
     }
 
     private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("X-Real-IP");
+        // Prefer remoteAddr to avoid trusting spoofable headers. If you deploy behind a reverse proxy,
+        // configure Spring's forwarded header support so remoteAddr is the client IP.
+        String ip = request.getRemoteAddr();
+        return (ip == null || ip.isBlank()) ? "unknown" : ip;
+    }
+
+    private static String sanitizeReturnTo(String returnTo) {
+        if (returnTo == null) {
+            return null;
         }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
+        String value = returnTo.trim();
+        if (value.isBlank()) {
+            return null;
         }
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
+        // Allow only same-site absolute paths.
+        if (!value.startsWith("/")) {
+            return null;
         }
-        return ip != null ? ip : "unknown";
+        if (value.startsWith("//")) {
+            return null;
+        }
+        if (value.contains("://")) {
+            return null;
+        }
+        if (value.contains("\r") || value.contains("\n")) {
+            return null;
+        }
+        return value;
+    }
+
+    private static String withReturnTo(String baseUrl, String returnTo) {
+        String safe = sanitizeReturnTo(returnTo);
+        if (safe == null) {
+            return baseUrl;
+        }
+        String glue = baseUrl.contains("?") ? "&" : "?";
+        return baseUrl + glue + "returnTo=" + URLEncoder.encode(safe, StandardCharsets.UTF_8);
+    }
+
+    private static void writeJsonError(HttpServletResponse response, HttpStatus status, String message)
+            throws java.io.IOException {
+        response.setStatus(status.value());
+        response.setContentType("application/json;charset=UTF-8");
+        response.getWriter().write("{\"status\":" + status.value() + ",\"message\":\"" + jsonEscape(message) + "\"}");
+    }
+
+    private static String jsonEscape(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r");
     }
 
     private org.springframework.security.authorization.AuthorizationDecision hasMinimumLevel(
@@ -264,7 +410,7 @@ public class SecurityConfig {
         }
 
         try {
-            User user = userDao.findByUsername(authentication.getName()).orElse(null);
+            User user = userDao.findEmployeeByUsername(authentication.getName()).orElse(null);
             if (user == null || user.getRoles().isEmpty()) {
                 return new org.springframework.security.authorization.AuthorizationDecision(false);
             }
@@ -282,7 +428,7 @@ public class SecurityConfig {
 
     private String determineEmployeeRedirectUrl(Authentication authentication) {
         try {
-            User user = userDao.findByUsername(authentication.getName()).orElse(null);
+            User user = userDao.findEmployeeByUsername(authentication.getName()).orElse(null);
             if (user == null || user.getRoles().isEmpty()) {
                 return "/employee";
             }
@@ -322,8 +468,6 @@ public class SecurityConfig {
             userService.mergeGuestWatchlistIntoUser(authentication.getName(), watchlist);
             session.removeAttribute(sessionService.guestWatchlistKey());
         }
-
-        userService.ensureBasicRole(authentication.getName());
     }
 
     private boolean hasAuthority(java.util.Collection<? extends GrantedAuthority> authorities, String code) {

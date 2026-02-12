@@ -41,6 +41,14 @@ public class WebConfig implements WebMvcConfigurer {
                 .addResolver(new PathResourceResolver() {
                     @Override
                     protected Resource getResource(String resourcePath, Resource location) throws IOException {
+                        // Do not serve SPA index.html under these server-side areas.
+                        // It can cause confusing behavior (and CSP issues) when users hit /member/** or /employee/**.
+                        if (resourcePath != null) {
+                            String p = resourcePath.startsWith("/") ? resourcePath.substring(1) : resourcePath;
+                            if (p.startsWith("member/") || p.startsWith("employee/") || p.startsWith("api/")) {
+                                return null;
+                            }
+                        }
                         Resource requestedResource = location.createRelative(resourcePath);
                         return requestedResource.exists() && requestedResource.isReadable()
                                 ? requestedResource

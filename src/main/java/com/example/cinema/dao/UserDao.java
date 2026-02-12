@@ -103,10 +103,11 @@ public class UserDao {
                     "SELECT id FROM members WHERE nickname = ?",
                     Long.class, username);
         } else {
-            // 插入員工（預設 role_id = 1, EMPLOYEE）
+            // Insert employee with default EMPLOYEE role from roles table.
             jdbcTemplate.update(
-                    "INSERT INTO employee (nickname, password, first_name, last_name, role_id) VALUES (?, ?, '', '', ?)",
-                    username, encodedPassword, 1L);
+                    "INSERT INTO employee (nickname, password, first_name, last_name, role_id) " +
+                            "VALUES (?, ?, '', '', (SELECT id FROM roles WHERE code = 'EMPLOYEE' LIMIT 1))",
+                    username, encodedPassword);
             return jdbcTemplate.queryForObject(
                     "SELECT id FROM employee WHERE nickname = ?",
                     Long.class, username);

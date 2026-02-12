@@ -10,7 +10,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -33,9 +32,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @Tag(name = "User Service", description = "處理用戶註冊、認證和個人資料管理")
 public class UserService {
     private static final Logger logger = LoggerFactory.getLogger(UserService.class);
-    private static final String USER_ROLE = "ROLE_USER";
-    private static final String ADMIN_ROLE = "ROLE_ADMIN";
-    private static final String EMPLOYEE_ROLE = "ROLE_EMPLOYEE";
 
     private final UserDao userDao;
     private final PasswordEncoder passwordEncoder;
@@ -69,16 +65,17 @@ public class UserService {
         
         logger.info("開始註冊用戶: {}", username);
         try {
+            UserType effectiveType = (userType == null) ? UserType.MEMBER : userType;
             String hash = passwordEncoder.encode(rawPassword);
-            Long userId = userDao.createUser(username, hash, userType);
-            
-            // 分配基本用戶角色
-            userDao.assignRole(userId, USER_ROLE);
-            
-            // 如果需要，分配管理員角色
-            if (asAdmin) {
-                userDao.assignRole(userId, ADMIN_ROLE);
+            Long userId = userDao.createUser(username, hash, effectiveType);
+
+            // This project models employee roles via employee.role_id -> roles.code.
+            // Member logins use the MEMBER role implicitly (see UserDao.MemberMapper).
+            if (effectiveType == UserType.EMPLOYEE && asAdmin) {
+                userDao.assignRole(userId, "ADMIN");
                 logger.info("已為用戶 {} 分配管理員權限", username);
+            } else if (effectiveType == UserType.MEMBER && asAdmin) {
+                logger.warn("忽略 member 註冊的 asAdmin=true：管理/IT/主管身分需建立員工帳號。");
             }
             
             logger.info("用戶註冊成功，用戶ID: {}", userId);
@@ -115,7 +112,6 @@ public class UserService {
         try {
             String hash = passwordEncoder.encode(rawPassword);
             Long userId = userDao.createUser(username, hash, UserType.EMPLOYEE);
-            userDao.assignRole(userId, EMPLOYEE_ROLE);
             
             logger.info("員工註冊成功，用戶ID: {}", userId);
             return userId;
@@ -152,7 +148,8 @@ public class UserService {
             return;
         }
         
-        User user = userDao.findByUsername(username).orElse(null);
+        // Watchlists are stored against members.id, so resolve the member record explicitly.
+        User user = userDao.findMemberByUsername(username).orElse(null);
         if (user == null) {
             logger.warn("找不到用戶: {}", username);
             return;
@@ -199,87 +196,5 @@ public class UserService {
         
         logger.info("成功為用戶 {} 添加了 {} 部新電影到觀看清單", username, addedCount);
     
-    }
-
-    /**
-     * 確保用戶擁有基本角色
-     * 
-     * @param username 要檢查的用戶名
-     */
-    @Transactional
-    @Operation(summary = "確保用戶擁有基本角色", description = "如果用戶沒有任何角色，則為其分配基本用戶角色")
-    @ApiResponse(responseCode = "200", description = "操作完成")
-    public void ensureBasicRole(
-            @Parameter(description = "要檢查的用戶名", required = true) String username) {
-        
-        logger.debug("檢查用戶 {} 的角色分配", username);
-        
-        User user = userDao.findByUsername(username).orElse(null);
-        if (user == null) {
-            logger.warn("找不到用戶: {}", username);
-            return;
-        }
-
-        // 如果用戶已有角色，則不需要處理
-        if (user.getRoles() != null && !user.getRoles().isEmpty()) {
-            logger.debug("用戶 {} 已有角色，跳過", username);
-            return;
-        }
-
-        logger.info("用戶 {} 沒有分配任何角色，正在分配基本用戶角色", username);
-        
-        // 嘗試獲取基本用戶角色ID
-        Long roleId = null;
-        try {
-            roleId = jdbcTemplate.queryForObject(
-                    "SELECT id FROM roles WHERE code = ?",
-                    Long.class,
-                    USER_ROLE);
-        } catch (EmptyResultDataAccessException ex) {
-            logger.info("基本用戶角色不存在，正在創建...");
-            try {
-                // 創建基本用戶角色
-                jdbcTemplate.update(
-                        "INSERT INTO roles (code, name, description, level) VALUES (?, ?, ?, ?)",
-                        USER_ROLE,
-                        "一般使用者",
-                        "基本用戶角色",
-                        10);
-                
-                // 獲取新創建的角色ID
-                roleId = jdbcTemplate.queryForObject(
-                        "SELECT id FROM roles WHERE code = ?",
-                        Long.class,
-                        USER_ROLE);
-                
-                logger.info("已創建基本用戶角色，ID: {}", roleId);
-                
-            } catch (DataAccessException e) {
-                logger.error("創建基本用戶角色時出錯", e);
-                return;
-            }
-        } catch (DataAccessException ex) {
-            logger.error("查詢基本用戶角色時出錯", ex);
-            return;
-        }
-
-        // 為用戶分配角色
-        if (roleId != null) {
-            try {
-                int updated = jdbcTemplate.update(
-                        "INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)",
-                        user.getId(),
-                        roleId);
-                
-                if (updated > 0) {
-                    logger.info("已為用戶 {} 分配基本用戶角色 (ID: {})", username, roleId);
-                } else {
-                    logger.debug("用戶 {} 已擁有基本用戶角色", username);
-                }
-                
-            } catch (DataAccessException e) {
-                logger.error("為用戶 {} 分配角色時出錯", username, e);
-            }
-        }
     }
 }
