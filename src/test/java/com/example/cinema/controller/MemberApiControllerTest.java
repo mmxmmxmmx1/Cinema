@@ -1,5 +1,8 @@
 package com.example.cinema.controller;
 
+import com.example.cinema.dto.UpcomingBookingResponse;
+import com.example.cinema.service.MemberLoyaltyService;
+import com.example.cinema.service.MemberOrderService;
 import com.example.cinema.service.SessionService;
 import com.example.cinema.service.SessionService.Realm;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,6 +16,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -35,6 +39,10 @@ class MemberApiControllerTest {
 
     @MockBean
     private SessionService sessionService;
+    @MockBean
+    private MemberLoyaltyService memberLoyaltyService;
+    @MockBean
+    private MemberOrderService memberOrderService;
 
     private MockHttpSession session;
 
@@ -94,14 +102,18 @@ class MemberApiControllerTest {
     void shouldGetMemberSummaryWhenAuthenticated() throws Exception {
         // Given
         when(sessionService.isAuthenticated(any(), eq(Realm.MEMBER))).thenReturn(true);
+        when(memberLoyaltyService.currentPoints(any())).thenReturn(360);
+        when(memberOrderService.listUpcomingBookings(any(), eq(5))).thenReturn(List.of(
+                new UpcomingBookingResponse(1L, "mv-01", "沙丘:第二部", "mv-01-st1", "1號廳", 2, null, "02/12 18:40")));
 
         // When & Then
         mockMvc.perform(get("/api/member/summary")
                 .session(session))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.points").value(12450))
+                .andExpect(jsonPath("$.points").value(360))
                 .andExpect(jsonPath("$.upcomingBookings").isArray())
-                .andExpect(jsonPath("$.upcomingBookings.length()").value(2));
+                .andExpect(jsonPath("$.upcomingBookings.length()").value(1))
+                .andExpect(jsonPath("$.upcomingBookings[0].movieTitle").value("沙丘:第二部"));
     }
 
     @Test

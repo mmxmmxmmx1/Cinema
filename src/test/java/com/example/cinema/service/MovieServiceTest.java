@@ -8,6 +8,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,6 +21,9 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @DisplayName("電影服務測試")
 class MovieServiceTest {
+
+    private static final ZoneId LOCAL_ZONE = ZoneId.of("Asia/Taipei");
+    private static final LocalTime OPERATIONAL_DAY_START = LocalTime.of(5, 0);
 
     private MovieService movieService;
 
@@ -157,6 +162,43 @@ class MovieServiceTest {
         assertTrue(movie.isPresent(), "應該找到電影");
         assertNotNull(movie.get().getShowtimes(), "場次列表不應為 null");
         assertFalse(movie.get().getShowtimes().isEmpty(), "場次列表不應為空");
+    }
+
+    @Test
+    @DisplayName("前台場次資訊應該只回傳未過時段")
+    void shouldReturnOnlyUpcomingShowtimesForCustomerView() {
+        String movieId = "mv-02";
+
+        Optional<Movie> movie = movieService.getMovieWithUpcomingShowtimes(movieId);
+
+        assertTrue(movie.isPresent(), "應該找到電影");
+        LocalTime now = LocalTime.now(LOCAL_ZONE);
+        LocalTime effectiveNow = now.isBefore(OPERATIONAL_DAY_START) ? now.plusHours(24) : now;
+
+        for (Showtime showtime : movie.get().getShowtimes()) {
+            LocalTime start = LocalTime.parse(showtime.getStartTime());
+            LocalTime normalized = start.isBefore(OPERATIONAL_DAY_START) ? start.plusHours(24) : start;
+            assertTrue(normalized.isAfter(effectiveNow),
+                    "回傳的場次都必須是未過時間，違規場次: " + showtime.getStartTime());
+        }
+    }
+
+    @Test
+    @DisplayName("訂票時段應為 07:00 到 22:45（不含 22:45）")
+    void shouldRespectDailyBookingWindow() {
+        assertFalse(movieService.isBookingWindowOpen(LocalTime.of(6, 59)));
+        assertTrue(movieService.isBookingWindowOpen(LocalTime.of(7, 0)));
+        assertTrue(movieService.isBookingWindowOpen(LocalTime.of(22, 44)));
+        assertFalse(movieService.isBookingWindowOpen(LocalTime.of(22, 45)));
+    }
+
+    @Test
+    @DisplayName("22:40 到 22:44 之間應出現停止訂票警告")
+    void shouldEnableWarningBetween2240And2244() {
+        assertFalse(movieService.isBookingWarning(LocalTime.of(22, 39)));
+        assertTrue(movieService.isBookingWarning(LocalTime.of(22, 40)));
+        assertTrue(movieService.isBookingWarning(LocalTime.of(22, 44)));
+        assertFalse(movieService.isBookingWarning(LocalTime.of(22, 45)));
     }
 
     @Test

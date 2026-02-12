@@ -21,9 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -93,8 +91,7 @@ class UserServiceTest {
         
         // 驗證方法調用
         verify(userDao).createUser(eq(TEST_USERNAME), eq(ENCODED_PASSWORD), eq(UserType.MEMBER));
-        verify(userDao).assignRole(USER_ID, "ROLE_USER");
-        verify(userDao, never()).assignRole(anyLong(), eq("ROLE_ADMIN"));
+        verify(userDao, never()).assignRole(anyLong(), anyString());
     }
     
     @Test
@@ -108,9 +105,8 @@ class UserServiceTest {
         // 驗證結果
         assertNotNull(userId);
         
-        // 驗證方法調用
-        verify(userDao).assignRole(USER_ID, "ROLE_USER");
-        verify(userDao).assignRole(USER_ID, "ROLE_ADMIN");
+        // member 註冊不會透過 roles/employee.role_id 指派管理權限
+        verify(userDao, never()).assignRole(anyLong(), anyString());
     }
     
     @Test
@@ -131,7 +127,7 @@ class UserServiceTest {
     @Test
     void mergeGuestWatchlistIntoUser_WithNewMovies_Success() {
         // 模擬用戶查詢
-        when(userDao.findByUsername(TEST_USERNAME)).thenReturn(Optional.of(testUser));
+        when(userDao.findMemberByUsername(TEST_USERNAME)).thenReturn(Optional.of(testUser));
         
         // 模擬現有觀看清單（空列表）
         when(jdbcTemplate.queryForList(
@@ -154,7 +150,7 @@ class UserServiceTest {
     @Test
     void mergeGuestWatchlistIntoUser_WithExistingMovies_NoDuplicates() {
         // 模擬用戶查詢
-        when(userDao.findByUsername(TEST_USERNAME)).thenReturn(Optional.of(testUser));
+        when(userDao.findMemberByUsername(TEST_USERNAME)).thenReturn(Optional.of(testUser));
         
         // 模擬現有觀看清單（已包含電影ID 1和2）
         when(jdbcTemplate.queryForList(
@@ -174,50 +170,5 @@ class UserServiceTest {
         );
     }
     
-    @Test
-    void ensureBasicRole_UserHasNoRole_AddsDefaultRole() {
-        // 創建沒有角色的測試用戶
-        User userWithoutRoles = new User(
-            USER_ID,
-            TEST_USERNAME,
-            "Test",
-            "User",
-            "test@example.com",
-            "1234567890",
-            ENCODED_PASSWORD,
-            UserType.MEMBER,
-            LocalDateTime.now(),
-            Collections.emptyList()  // 沒有角色
-        );
-        when(userDao.findByUsername(TEST_USERNAME)).thenReturn(Optional.of(userWithoutRoles));
-        
-        Long newRoleId = 999L;
-        
-        // 模擬角色查詢（第一次查詢角色不存在，第二次查詢返回新創建的角色ID）
-        when(jdbcTemplate.queryForObject(
-            eq("SELECT id FROM roles WHERE code = ?"),
-            eq(Long.class),
-            eq("ROLE_USER")))
-            .thenThrow(new EmptyResultDataAccessException(1))  // 第一次：角色不存在
-            .thenReturn(newRoleId);  // 第二次：返回新創建的角色ID
-        
-        // 執行測試
-        userService.ensureBasicRole(TEST_USERNAME);
-        
-        // 驗證創建了默認角色
-        verify(jdbcTemplate).update(
-            eq("INSERT INTO roles (code, name, description, level) VALUES (?, ?, ?, ?)"),
-            eq("ROLE_USER"),
-            eq("一般使用者"),
-            eq("基本用戶角色"),
-            eq(10)
-        );
-        
-        // 驗證為用戶分配了角色
-        verify(jdbcTemplate).update(
-            eq("INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)"),
-            eq(USER_ID),
-            eq(newRoleId)
-        );
-    }
+    // ensureBasicRole 已移除：此專案的 member 角色為隱含 MEMBER；employee 角色由 employee.role_id -> roles.code 決定。
 }
