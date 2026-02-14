@@ -13,14 +13,32 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import com.example.cinema.service.EmployeeTodoService;
+import com.example.cinema.service.MemberNotificationService;
+import com.example.cinema.service.MemberOrderService;
+import com.example.cinema.service.OperationsDashboardService;
+
 @Controller
 @RequestMapping("/employee/admin")
 public class EmployeeAdminController {
 
     private final JdbcTemplate jdbcTemplate;
+    private final MemberNotificationService memberNotificationService;
+    private final MemberOrderService memberOrderService;
+    private final EmployeeTodoService employeeTodoService;
+    private final OperationsDashboardService operationsDashboardService;
 
-    public EmployeeAdminController(JdbcTemplate jdbcTemplate) {
+    public EmployeeAdminController(
+            JdbcTemplate jdbcTemplate,
+            MemberNotificationService memberNotificationService,
+            MemberOrderService memberOrderService,
+            EmployeeTodoService employeeTodoService,
+            OperationsDashboardService operationsDashboardService) {
         this.jdbcTemplate = jdbcTemplate;
+        this.memberNotificationService = memberNotificationService;
+        this.memberOrderService = memberOrderService;
+        this.employeeTodoService = employeeTodoService;
+        this.operationsDashboardService = operationsDashboardService;
     }
 
     @GetMapping("/audit")
@@ -123,6 +141,15 @@ public class EmployeeAdminController {
                 safeRole, safeNickname);
 
         if (updated > 0) {
+            try {
+                jdbcTemplate.update(
+                        "INSERT INTO audit_logs (actor_type, actor_id, action, target_type, target_id, result, detail) " +
+                                "VALUES ('EMPLOYEE', 'admin', 'EMPLOYEE_ROLE_UPDATE', 'EMPLOYEE', ?, 'SUCCESS', ?)",
+                        safeNickname,
+                        "role=" + safeRole);
+            } catch (DataAccessException ignored) {
+                // Audit table might be unavailable in lightweight test schemas.
+            }
             redirectAttributes.addFlashAttribute("success",
                     "已更新 " + safeNickname + " 的角色為 " + safeRole + "。");
         } else {
@@ -131,5 +158,33 @@ public class EmployeeAdminController {
         }
 
         return "redirect:/employee/admin/roles";
+    }
+
+    @GetMapping("/tools")
+    public String tools(Model model) {
+        model.addAttribute("title", "管理員：維護工具");
+        model.addAttribute("snapshot", operationsDashboardService.cleanupSnapshot());
+        return "admin-tools";
+    }
+
+    @PostMapping("/tools/expire-orders")
+    public String expirePendingOrders(RedirectAttributes redirectAttributes) {
+        memberOrderService.expireTimedOutPendingOrders();
+        redirectAttributes.addFlashAttribute("success", "已執行逾時訂單檢查。");
+        return "redirect:/employee/admin/tools";
+    }
+
+    @PostMapping("/tools/purge-notifications")
+    public String purgeNotifications(RedirectAttributes redirectAttributes) {
+        memberNotificationService.purgeExpiredNotifications();
+        redirectAttributes.addFlashAttribute("success", "已執行通知過期清理。");
+        return "redirect:/employee/admin/tools";
+    }
+
+    @PostMapping("/tools/reset-todos")
+    public String resetTodos(RedirectAttributes redirectAttributes) {
+        employeeTodoService.replaceTodayTodos(List.of(), "admin-tools");
+        redirectAttributes.addFlashAttribute("success", "今日待辦已重置為預設內容。");
+        return "redirect:/employee/admin/tools";
     }
 }

@@ -1,6 +1,7 @@
 package com.example.cinema.controller;
 
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
@@ -77,16 +78,18 @@ class MemberOrdersPageControllerTest {
     void shouldRenderConsistentShowtimeLabelFromOrderInstant() throws Exception {
         Instant showStart = ZonedDateTime.of(2026, 2, 12, 8, 50, 0, 0,
                 ZoneId.of("Asia/Taipei")).toInstant();
-        when(memberOrderService.listOrders(nullable(String.class))).thenReturn(List.of(
+        when(memberOrderService.listAllOrders(nullable(String.class), anyInt())).thenReturn(List.of(
                 new OrderSummaryResponse(1L, "mv-02", "mv-02-st1", "1號廳", 4, 1200, "PAID",
                         Instant.parse("2026-02-12T00:00:00Z"), Instant.parse("2026-02-12T00:05:00Z"), showStart)));
         when(movieService.getMovieWithAvailability("mv-02"))
                 .thenReturn(Optional.of(new Movie("mv-02", "奧本海默", "", "", "", List.of())));
+        when(movieService.getShowtime("mv-02", "mv-02-st1"))
+                .thenReturn(Optional.empty());
 
         mockMvc.perform(get("/member/orders"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("member-orders"))
-                .andExpect(model().attributeExists("orders"))
+                .andExpect(model().attributeExists("activePaidOrders"))
                 .andExpect(content().string(containsString("02/12 08:50")));
     }
 }

@@ -16,6 +16,7 @@ import com.example.cinema.service.EmployeeTodoService;
 import com.example.cinema.service.MemberLoyaltyService;
 import com.example.cinema.service.MemberNotificationService;
 import com.example.cinema.service.MemberOrderService;
+import com.example.cinema.service.OperationsDashboardService;
 import com.example.cinema.service.SessionService;
 import com.example.cinema.service.SessionService.Realm;
 
@@ -40,6 +41,7 @@ public class PageController {
     private final ObjectProvider<MemberLoyaltyService> memberLoyaltyServiceProvider;
     private final ObjectProvider<MemberOrderService> memberOrderServiceProvider;
     private final ObjectProvider<MemberNotificationService> memberNotificationServiceProvider;
+    private final ObjectProvider<OperationsDashboardService> operationsDashboardServiceProvider;
     private final SessionService sessionService;
 
     public PageController(
@@ -48,12 +50,14 @@ public class PageController {
             ObjectProvider<MemberLoyaltyService> memberLoyaltyServiceProvider,
             ObjectProvider<MemberOrderService> memberOrderServiceProvider,
             ObjectProvider<MemberNotificationService> memberNotificationServiceProvider,
+            ObjectProvider<OperationsDashboardService> operationsDashboardServiceProvider,
             SessionService sessionService) {
         this.movieService = movieService;
         this.employeeTodoServiceProvider = employeeTodoServiceProvider;
         this.memberLoyaltyServiceProvider = memberLoyaltyServiceProvider;
         this.memberOrderServiceProvider = memberOrderServiceProvider;
         this.memberNotificationServiceProvider = memberNotificationServiceProvider;
+        this.operationsDashboardServiceProvider = operationsDashboardServiceProvider;
         this.sessionService = sessionService;
     }
 
@@ -138,6 +142,7 @@ public class PageController {
                 MemberNotificationService notificationService = memberNotificationServiceProvider.getIfAvailable();
                 if (notificationService != null) {
                     model.addAttribute("recentNotifications", notificationService.listForMember(username, 5));
+                    model.addAttribute("unreadNotificationCount", notificationService.unreadCount(username));
                 }
             }
         } catch (Exception ex) {
@@ -225,6 +230,10 @@ public class PageController {
         sessionService.updateLastActivity(session, Realm.EMPLOYEE);
         model.addAttribute("title", "很好睡電影院 IT 控制台");
         model.addAttribute("message", "監控系統健康狀態與維護排程。");
+        OperationsDashboardService service = operationsDashboardServiceProvider.getIfAvailable();
+        if (service != null) {
+            model.addAttribute("itMetrics", service.itMetrics());
+        }
         return "it";
     }
 
@@ -237,6 +246,10 @@ public class PageController {
         sessionService.updateLastActivity(session, Realm.EMPLOYEE);
         model.addAttribute("title", "很好睡電影院 主管儀表板");
         model.addAttribute("message", "查看營運概況、票務熱區與員工排班摘要。");
+        OperationsDashboardService service = operationsDashboardServiceProvider.getIfAvailable();
+        if (service != null) {
+            model.addAttribute("managerMetrics", service.managerMetrics());
+        }
         return "manager";
     }
 
@@ -249,6 +262,11 @@ public class PageController {
         sessionService.updateLastActivity(session, Realm.EMPLOYEE);
         model.addAttribute("title", "很好睡電影院管理中心");
         model.addAttribute("message", "檢視營運指標、角色權限與系統公告。");
+        OperationsDashboardService service = operationsDashboardServiceProvider.getIfAvailable();
+        if (service != null) {
+            model.addAttribute("adminMetrics", service.adminMetrics());
+            model.addAttribute("cleanupSnapshot", service.cleanupSnapshot());
+        }
         return "admin";
     }
 

@@ -327,6 +327,7 @@ public class SecurityConfig {
                 .permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/csrf").permitAll()
+                .requestMatchers("/api/health").permitAll()
                 .requestMatchers("/api/guest/**", "/api/movies/**").permitAll()
                 .requestMatchers("/movies/**").permitAll() // 加這行
                 .anyRequest().authenticated())

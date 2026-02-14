@@ -32,15 +32,23 @@
         <div class="kpi-grid">
             <div class="kpi-card">
                 <h3>上座率</h3>
-                <p>72%</p>
+                <p th:text="${(managerMetrics != null ? managerMetrics.occupancyRate : 0) + '%'}">0%</p>
             </div>
             <div class="kpi-card">
                 <h3>高峰時段</h3>
-                <p>19:00</p>
+                <p th:text="${managerMetrics != null ? managerMetrics.peakTime : '--'}">--</p>
             </div>
             <div class="kpi-card">
-                <h3>異常場次</h3>
-                <p>0</p>
+                <h3>進行中維修</h3>
+                <p th:text="${managerMetrics != null ? managerMetrics.openMaintenanceCount : 0}">0</p>
+            </div>
+            <div class="kpi-card">
+                <h3>今日取消訂單</h3>
+                <p th:text="${managerMetrics != null ? managerMetrics.todayCancellationCount : 0}">0</p>
+            </div>
+            <div class="kpi-card">
+                <h3>今日已付款訂單</h3>
+                <p th:text="${managerMetrics != null ? managerMetrics.todayPaidOrders : 0}">0</p>
             </div>
         </div>
     </section>
@@ -110,4 +118,3 @@
 </script>
 </body>
 </html>
-

@@ -16,6 +16,7 @@ import com.example.cinema.controller.MemberBookingController;
 import com.example.cinema.controller.MemberNotificationController;
 import com.example.cinema.controller.MemberOrderController;
 import com.example.cinema.controller.MovieController;
+import com.example.cinema.filter.TraceIdFilter;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -36,6 +37,11 @@ public class ApiExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiError> illegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
         return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request, null);
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ApiError> rateLimit(RateLimitExceededException ex, HttpServletRequest request) {
+        return build(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request, null);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -63,7 +69,8 @@ public class ApiExceptionHandler {
                 status.getReasonPhrase(),
                 message,
                 request == null ? null : request.getRequestURI(),
-                details);
+                details,
+                request == null ? null : String.valueOf(request.getAttribute(TraceIdFilter.TRACE_ID_ATTR)));
         return ResponseEntity.status(status).body(payload);
     }
 }

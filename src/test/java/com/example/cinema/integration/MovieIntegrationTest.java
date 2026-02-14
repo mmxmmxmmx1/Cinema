@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * 電影功能整合測試
  * 測試完整的電影相關流程
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @ActiveProfiles("test")
 @DisplayName("電影功能整合測試")
 class MovieIntegrationTest {

@@ -305,7 +305,11 @@ const CheckoutPage = {
               <p><strong>張數：</strong>{{ seatIds.length }}</p>
               <p><strong>票價：</strong>{{ unitPrice }} / 張</p>
               <p><strong>總價：</strong>{{ totalPrice }}</p>
-              <p style="margin-bottom: 0.5rem;">
+              <p v-if="alreadyPaidOrder" style="margin-bottom: 0.5rem;">
+                <strong>付款狀態：</strong>
+                已付款（訂單 #{{ alreadyPaidOrder.orderId }}）
+              </p>
+              <p v-else style="margin-bottom: 0.5rem;">
                 <strong>付款模擬：</strong>
                 <select v-model="paymentMode">
                   <option value="SUCCESS">成功</option>
@@ -318,10 +322,11 @@ const CheckoutPage = {
               <div v-if="paySuccess" class="loading" style="margin-top: 14px;">{{ paySuccess }}</div>
 
               <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
-                <button type="button" :disabled="paying" @click="confirmPay">
+                <button v-if="!alreadyPaidOrder" type="button" :disabled="paying" @click="confirmPay">
                   {{ paying ? '付款處理中…' : '確認付款' }}
                 </button>
                 <button type="button" class="primary-link" @click="goToOrders">我的訂單</button>
+                <button v-if="alreadyPaidOrder" type="button" class="primary-link" @click="goToOrderDetail">查看該筆訂單</button>
               </div>
               <p style="margin-top: 12px; color: #b9bedb; line-height: 1.6;">
                 規則：一次最多 4 張；6 小時內最多 4 張，且只能同一個影廳，不能跨影廳。
@@ -345,7 +350,8 @@ const CheckoutPage = {
       paySuccess: null,
       unitPrice: 300,
       totalPrice: 0,
-      paymentMode: 'SUCCESS'
+      paymentMode: 'SUCCESS',
+      alreadyPaidOrder: null
     };
   },
   async mounted() {
@@ -405,6 +411,25 @@ const CheckoutPage = {
       } catch (_) {}
       return message;
     },
+    isCsrfRelatedMessage(message) {
+      const text = typeof message === 'string' ? message : '';
+      return /csrf|xsrf|token/i.test(text);
+    },
+    async resolveForbiddenMessage(defaultMessage, serverMessage) {
+      const message = (serverMessage || '').trim();
+      const checkJson = await refreshMemberAuth();
+      if (!checkJson || !checkJson.authenticated) {
+        window.location.href = `/member/login?returnTo=${encodeURIComponent(this.checkoutPath())}`;
+        return null;
+      }
+      if (checkJson.employee && !checkJson.member) {
+        return `Forbidden：你目前是員工登入（${checkJson.username || ''}），請先員工登出後再用會員登入。`;
+      }
+      if (!message || message === defaultMessage || message === 'Forbidden' || this.isCsrfRelatedMessage(message)) {
+        return 'CSRF token 無效或已過期，請重新整理後再試。';
+      }
+      return message;
+    },
     checkoutPath() {
       return `/checkout/${encodeURIComponent(this.$route.params.movieId)}/showtimes/${encodeURIComponent(this.$route.params.showtimeId)}`;
     },
@@ -416,9 +441,35 @@ const CheckoutPage = {
       this.error = null;
       this.payError = null;
       this.paySuccess = null;
+      this.alreadyPaidOrder = null;
       try {
+        const [movieRes, showtimeRes] = await Promise.all([
+          fetch(`/api/movies/${this.$route.params.movieId}`),
+          fetch(`/api/movies/${this.$route.params.movieId}/showtimes/${this.$route.params.showtimeId}`)
+        ]);
+        if (!movieRes.ok) throw new Error('Failed to load movie');
+        if (!showtimeRes.ok) {
+          if (showtimeRes.status === 410 || showtimeRes.status === 403 || showtimeRes.status === 404) {
+            throw new Error('目前非訂票時段或場次已開演，無法訂票。');
+          }
+          throw new Error('Failed to load showtime');
+        }
+        this.movie = await movieRes.json();
+        this.details = await showtimeRes.json();
+
         const raw = sessionStorage.getItem('pendingCheckout');
         if (!raw) {
+          const existingPaidOrder = await this.findLatestPaidOrderForCurrentShowtime();
+          if (existingPaidOrder) {
+            this.alreadyPaidOrder = existingPaidOrder;
+            this.seatIds = Array.isArray(existingPaidOrder.seatIds) ? existingPaidOrder.seatIds : [];
+            this.unitPrice = typeof existingPaidOrder.unitPrice === 'number' ? existingPaidOrder.unitPrice : 300;
+            this.totalPrice = typeof existingPaidOrder.totalPrice === 'number'
+              ? existingPaidOrder.totalPrice
+              : this.seatIds.length * this.unitPrice;
+            this.paySuccess = `此場次你已完成付款（訂單 #${existingPaidOrder.orderId}）。不能重複購買相同已成立座位。`;
+            return;
+          }
           throw new Error('找不到結帳資料，請回到選位重新操作。');
         }
         const pending = JSON.parse(raw);
@@ -441,20 +492,6 @@ const CheckoutPage = {
         this.seatIds = normalized;
         this.unitPrice = 300;
         this.totalPrice = this.seatIds.length * this.unitPrice;
-
-        const [movieRes, showtimeRes] = await Promise.all([
-          fetch(`/api/movies/${this.$route.params.movieId}`),
-          fetch(`/api/movies/${this.$route.params.movieId}/showtimes/${this.$route.params.showtimeId}`)
-        ]);
-        if (!movieRes.ok) throw new Error('Failed to load movie');
-        if (!showtimeRes.ok) {
-          if (showtimeRes.status === 410 || showtimeRes.status === 403 || showtimeRes.status === 404) {
-            throw new Error('目前非訂票時段或場次已開演，無法訂票。');
-          }
-          throw new Error('Failed to load showtime');
-        }
-        this.movie = await movieRes.json();
-        this.details = await showtimeRes.json();
       } catch (err) {
         this.error = err && err.message ? err.message : '無法載入結帳頁';
       } finally {
@@ -463,6 +500,10 @@ const CheckoutPage = {
     },
     async confirmPay() {
       if (this.paying) return;
+      if (this.alreadyPaidOrder) {
+        this.paySuccess = `此場次已付款（訂單 #${this.alreadyPaidOrder.orderId}），不可重複購買。`;
+        return;
+      }
       this.payError = null;
       this.paySuccess = null;
 
@@ -484,13 +525,13 @@ const CheckoutPage = {
 
         let xsrf = await this.ensureCsrfCookie();
 
-        const createOrder = async () => {
+        const createOrder = async (token) => {
           return fetch('/member/api/orders', {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
               'Content-Type': 'application/json',
-              ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {})
+              ...(token ? { 'X-XSRF-TOKEN': token } : {})
             },
             body: JSON.stringify({
               movieId: this.$route.params.movieId,
@@ -500,44 +541,20 @@ const CheckoutPage = {
           });
         };
 
-        let createRes = await createOrder();
+        let createRes = await createOrder(xsrf);
         if (createRes.status === 403) {
           // If CSRF token was missing/stale, refresh and retry once.
-          await this.ensureCsrfCookie();
           const refreshed = await this.ensureCsrfCookie();
-          xsrf = refreshed;
-          createRes = await fetch('/member/api/orders', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(refreshed ? { 'X-XSRF-TOKEN': refreshed } : {})
-            },
-            body: JSON.stringify({
-              movieId: this.$route.params.movieId,
-              showtimeId: this.$route.params.showtimeId,
-              seatIds: this.seatIds
-            })
-          });
+          xsrf = refreshed || xsrf;
+          createRes = await createOrder(xsrf);
         }
 
         if (!createRes.ok) {
           let msg = '建立訂單失敗';
           msg = await this.readApiErrorMessage(createRes, msg);
-          if (createRes.status === 403 && (!msg || msg === '建立訂單失敗' || msg === 'Forbidden')) {
-            // Check again: wrong role vs CSRF.
-            try {
-              const checkJson = await refreshMemberAuth();
-              if (!checkJson || !checkJson.authenticated) {
-                window.location.href = `/member/login?returnTo=${encodeURIComponent(this.checkoutPath())}`;
-                return;
-              }
-              if (checkJson.employee && !checkJson.member) {
-                msg = `Forbidden：你目前是員工登入（${checkJson.username || ''}），請先員工登出後再用會員登入。`;
-              } else {
-                msg = '沒有會員權限或 CSRF 驗證失敗，請重新登入或重新整理後再試。';
-              }
-            } catch (_) {}
+          if (createRes.status === 403) {
+            msg = await this.resolveForbiddenMessage('建立訂單失敗', msg);
+            if (!msg) return;
           }
           this.payError = msg;
           return;
@@ -561,31 +578,30 @@ const CheckoutPage = {
           sessionStorage.setItem(idempotencyStorageKey, paymentIdempotencyKey);
         }
 
-        const payRes = await fetch(`/member/api/orders/${orderId}/pay?mode=${encodeURIComponent(this.paymentMode)}`, {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: {
-            ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
-            'Idempotency-Key': paymentIdempotencyKey
-          }
-        });
+        const payOrder = async (token) => {
+          return fetch(`/member/api/orders/${orderId}/pay?mode=${encodeURIComponent(this.paymentMode)}`, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+              ...(token ? { 'X-XSRF-TOKEN': token } : {}),
+              'Idempotency-Key': paymentIdempotencyKey
+            }
+          });
+        };
+
+        let payRes = await payOrder(xsrf);
+        if (payRes.status === 403) {
+          const refreshed = await this.ensureCsrfCookie();
+          xsrf = refreshed || xsrf;
+          payRes = await payOrder(xsrf);
+        }
 
         if (!payRes.ok) {
           let msg = '付款失敗';
           msg = await this.readApiErrorMessage(payRes, msg);
-          if (payRes.status === 403 && (!msg || msg === '付款失敗' || msg === 'Forbidden')) {
-            try {
-              const checkJson = await refreshMemberAuth();
-              if (!checkJson || !checkJson.authenticated) {
-                window.location.href = `/member/login?returnTo=${encodeURIComponent(this.checkoutPath())}`;
-                return;
-              }
-              if (checkJson.employee && !checkJson.member) {
-                msg = `Forbidden：你目前是員工登入（${checkJson.username || ''}），請先員工登出後再用會員登入。`;
-              } else {
-                msg = '沒有會員權限或 CSRF 驗證失敗，請重新登入或重新整理後再試。';
-              }
-            } catch (_) {}
+          if (payRes.status === 403) {
+            msg = await this.resolveForbiddenMessage('付款失敗', msg);
+            if (!msg) return;
           }
           this.payError = msg;
           return;
@@ -618,7 +634,37 @@ const CheckoutPage = {
     },
     goBack() { this.$router.go(-1); },
     goToSeatSelection() { this.$router.push(this.seatSelectionPath()); },
-    goToOrders() { window.location.href = '/member/orders'; }
+    goToOrders() { window.location.href = '/member/orders'; },
+    goToOrderDetail() {
+      if (this.alreadyPaidOrder && this.alreadyPaidOrder.orderId) {
+        window.location.href = `/member/orders/${this.alreadyPaidOrder.orderId}`;
+        return;
+      }
+      this.goToOrders();
+    },
+    async findLatestPaidOrderForCurrentShowtime() {
+      try {
+        const res = await fetch('/member/api/orders', { credentials: 'same-origin' });
+        if (!res.ok) return null;
+        const orders = await res.json();
+        if (!Array.isArray(orders) || orders.length === 0) return null;
+
+        const paid = orders.find(o =>
+          o &&
+          o.status === 'PAID' &&
+          o.movieId === this.$route.params.movieId &&
+          o.showtimeId === this.$route.params.showtimeId);
+        if (!paid || !paid.orderId) return null;
+
+        const detailRes = await fetch(`/member/api/orders/${paid.orderId}`, { credentials: 'same-origin' });
+        if (!detailRes.ok) return null;
+        const detail = await detailRes.json();
+        if (!detail || detail.status !== 'PAID') return null;
+        return detail;
+      } catch (_) {
+        return null;
+      }
+    }
   }
 };
 

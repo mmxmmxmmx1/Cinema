@@ -127,6 +127,22 @@ a.member-link:hover,
   flex-wrap: wrap;
 }
 
+.member-actions label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.92rem;
+  color: var(--member-muted);
+}
+
+.member-actions select {
+  min-width: 120px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--member-fg);
+}
+
 .member-btn {
   background: var(--member-btn);
   color: #fff;

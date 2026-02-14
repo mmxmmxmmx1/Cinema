@@ -44,7 +44,7 @@
             <li th:each="log : ${logs}">
                 <strong th:text="${log.description}">訂單 #1 付款回饋</strong>
                 <span th:text="${' · ' + (log.points > 0 ? '+' : '') + log.points + ' 點'}">+120 點</span>
-                <span th:text="${' · 金額 $' + log.amount}">金額 $1200</span>
+                <span th:if="${log.amount != 0}" th:text="${' · 金額 $' + log.amount}">金額 $1200</span>
                 <div class="member-meta" th:text="${log.paidAt}">2026-02-11 20:10</div>
             </li>
         </ul>

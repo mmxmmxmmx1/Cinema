@@ -3,8 +3,11 @@ package com.example.cinema.controller;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.security.core.Authentication;
@@ -24,6 +27,8 @@ import com.example.cinema.model.Showtime;
 import com.example.cinema.service.MemberOrderService;
 import com.example.cinema.service.MovieService;
 
+import org.springframework.beans.factory.annotation.Value;
+
 @Controller
 public class MemberOrdersPageController {
 
@@ -34,24 +39,62 @@ public class MemberOrdersPageController {
 
     private final MemberOrderService memberOrderService;
     private final MovieService movieService;
+    private final int pendingTimeoutMinutes;
+    private final int notificationRetentionDays;
 
-    public MemberOrdersPageController(MemberOrderService memberOrderService, MovieService movieService) {
+    public MemberOrdersPageController(
+            MemberOrderService memberOrderService,
+            MovieService movieService,
+            @Value("${app.order.pending-timeout-minutes:15}") int pendingTimeoutMinutes,
+            @Value("${app.notification.retention-days:30}") int notificationRetentionDays) {
         this.memberOrderService = memberOrderService;
         this.movieService = movieService;
+        this.pendingTimeoutMinutes = Math.max(1, pendingTimeoutMinutes);
+        this.notificationRetentionDays = Math.max(1, notificationRetentionDays);
     }
 
     @GetMapping("/member/orders")
     public String list(Authentication authentication, Model model) {
         String username = authentication == null ? null : authentication.getName();
-        List<MemberOrderSummaryVm> orders;
+        List<MemberOrderSummaryVm> pendingOrFailedOrders = new ArrayList<>();
+        List<MemberOrderSummaryVm> activePaidOrders = new ArrayList<>();
+        List<MemberOrderSummaryVm> historyPaidOrders = new ArrayList<>();
+        List<MemberOrderSummaryVm> inactiveOrders = new ArrayList<>();
+
         try {
-            List<OrderSummaryResponse> raw = memberOrderService.listOrders(username);
-            orders = raw.stream().map(this::toVm).toList();
+            List<OrderSummaryResponse> raw = memberOrderService.listAllOrders(username, 300);
+            Instant now = AppClock.nowInstant();
+            Map<String, Integer> durationByShowtime = resolveShowtimeDurations(raw);
+
+            for (OrderSummaryResponse order : raw) {
+                MemberOrderSummaryVm vm = toVm(order);
+                String status = normalizeStatus(order.status());
+                if ("PENDING".equals(status) || "FAILED".equals(status)) {
+                    pendingOrFailedOrders.add(vm);
+                    continue;
+                }
+                if ("PAID".equals(status)) {
+                    if (isUpcomingOrInProgress(order, now, durationByShowtime)) {
+                        activePaidOrders.add(vm);
+                    } else {
+                        historyPaidOrders.add(vm);
+                    }
+                    continue;
+                }
+                inactiveOrders.add(vm);
+            }
         } catch (Exception ex) {
-            orders = Collections.emptyList();
+            pendingOrFailedOrders = Collections.emptyList();
+            activePaidOrders = Collections.emptyList();
+            historyPaidOrders = Collections.emptyList();
+            inactiveOrders = Collections.emptyList();
             model.addAttribute("error", "無法載入訂單（資料庫可能尚未啟動）。");
         }
-        model.addAttribute("orders", orders);
+        model.addAttribute("pendingOrFailedOrders", pendingOrFailedOrders);
+        model.addAttribute("activePaidOrders", activePaidOrders);
+        model.addAttribute("historyPaidOrders", historyPaidOrders);
+        model.addAttribute("inactiveOrders", inactiveOrders);
+        model.addAttribute("notificationRetentionDays", notificationRetentionDays);
         return "member-orders";
     }
 
@@ -88,6 +131,8 @@ public class MemberOrdersPageController {
         String movieTitle = movieTitle(o.movieId());
         String showtime = showtimeStart(o.movieId(), o.showtimeId(), o.showStartAt());
         CancelPolicy cancelPolicy = evaluateCancelPolicy(o.status(), o.showStartAt());
+        String normalizedStatus = normalizeStatus(o.status());
+        String pendingRemainLabel = buildPendingRemainLabel(normalizedStatus, o.createdAt());
         return new MemberOrderSummaryVm(
                 o.orderId(),
                 movieTitle,
@@ -95,11 +140,13 @@ public class MemberOrdersPageController {
                 o.auditorium(),
                 o.totalQty(),
                 o.totalPrice(),
-                o.status(),
+                normalizedStatus,
+                statusLabel(normalizedStatus),
                 fmt(o.createdAt()),
                 fmt(o.paidAt()),
                 cancelPolicy.cancellable(),
-                cancelPolicy.reason());
+                cancelPolicy.reason(),
+                pendingRemainLabel);
     }
 
     private MemberOrderDetailVm toDetailVm(OrderDetailResponse o) {
@@ -115,6 +162,7 @@ public class MemberOrdersPageController {
                 o.unitPrice(),
                 o.totalPrice(),
                 o.status(),
+                statusLabel(normalizeStatus(o.status())),
                 fmt(o.createdAt()),
                 fmt(o.paidAt()),
                 fmt(o.cancelledAt()),
@@ -125,6 +173,73 @@ public class MemberOrdersPageController {
                 o.seatIds(),
                 cancelPolicy.cancellable(),
                 cancelPolicy.reason());
+    }
+
+    private boolean isUpcomingOrInProgress(OrderSummaryResponse order, Instant now, Map<String, Integer> durationByShowtime) {
+        if (order == null || order.showStartAt() == null) {
+            return false;
+        }
+        String key = showtimeKey(order.movieId(), order.showtimeId());
+        int durationMinutes = Math.max(0, durationByShowtime.getOrDefault(key, 0));
+        Instant showEnd = order.showStartAt().plus(durationMinutes, ChronoUnit.MINUTES);
+        return showEnd.isAfter(now);
+    }
+
+    private Map<String, Integer> resolveShowtimeDurations(List<OrderSummaryResponse> orders) {
+        Map<String, Integer> map = new HashMap<>();
+        if (orders == null || orders.isEmpty()) {
+            return map;
+        }
+        for (OrderSummaryResponse order : orders) {
+            if (order == null) {
+                continue;
+            }
+            String key = showtimeKey(order.movieId(), order.showtimeId());
+            if (map.containsKey(key)) {
+                continue;
+            }
+            int duration = movieService.getShowtime(order.movieId(), order.showtimeId())
+                    .map(showtime -> Math.max(0, showtime.getDurationMinutes()))
+                    .orElse(0);
+            map.put(key, duration);
+        }
+        return map;
+    }
+
+    private static String showtimeKey(String movieId, String showtimeId) {
+        return String.valueOf(movieId) + "|" + String.valueOf(showtimeId);
+    }
+
+    private String buildPendingRemainLabel(String status, Instant createdAt) {
+        if (!"PENDING".equals(status) || createdAt == null) {
+            if ("FAILED".equals(status)) {
+                return "付款失敗，可重新付款或取消訂單。";
+            }
+            return null;
+        }
+        Instant deadline = createdAt.plus(pendingTimeoutMinutes, ChronoUnit.MINUTES);
+        Instant now = AppClock.nowInstant();
+        if (!now.isBefore(deadline)) {
+            return "超過付款時限，系統將於 1 分鐘內自動轉為失效。";
+        }
+        long remainingSeconds = ChronoUnit.SECONDS.between(now, deadline);
+        long remainingMinutes = Math.max(1, (remainingSeconds + 59) / 60);
+        return "待付款，剩餘約 " + remainingMinutes + " 分鐘。";
+    }
+
+    private static String normalizeStatus(String status) {
+        return status == null ? "UNKNOWN" : status.trim().toUpperCase();
+    }
+
+    private static String statusLabel(String normalizedStatus) {
+        return switch (normalizedStatus) {
+            case "PENDING" -> "待付款";
+            case "PAID" -> "已付款";
+            case "FAILED" -> "付款失敗";
+            case "EXPIRED" -> "已失效";
+            case "CANCELLED" -> "已取消";
+            default -> normalizedStatus;
+        };
     }
 
     private String movieTitle(String movieId) {
@@ -180,10 +295,12 @@ public class MemberOrdersPageController {
             int totalQty,
             int totalPrice,
             String status,
+            String statusLabel,
             String createdAt,
             String paidAt,
             boolean cancellable,
-            String cancelHint) {
+            String cancelHint,
+            String pendingRemainLabel) {
     }
 
     public record MemberOrderDetailVm(
@@ -195,6 +312,7 @@ public class MemberOrdersPageController {
             int unitPrice,
             int totalPrice,
             String status,
+            String statusLabel,
             String createdAt,
             String paidAt,
             String cancelledAt,

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${title}">管理員：維護工具</title>
+    <style>
+        body { font-family: "Noto Sans TC", "Segoe UI", Arial, sans-serif; margin: 0; background: #10152a; color: #f8f9ff; }
+        header { padding: 30px 42px; background: linear-gradient(135deg, #2d3c68, #1c2642); box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45); }
+        main { padding: 30px 42px; display: grid; gap: 18px; }
+        section { background: rgba(255, 255, 255, 0.05); border-radius: 14px; padding: 18px; border: 1px solid rgba(255,255,255,0.1); }
+        .meta { color: #b9bedb; }
+        button { background: #3b7ddd; color: #fff; border: none; padding: 10px 24px; border-radius: 20px; cursor: pointer; }
+        button:hover { background: #5390ff; }
+        .ok { color: #ccffe5; background: rgba(88, 255, 161, 0.16); border: 1px solid rgba(88, 255, 161, 0.35); padding: 10px 12px; border-radius: 12px; }
+        .err { color: #ffd7d7; background: rgba(255, 107, 107, 0.18); border: 1px solid rgba(255, 107, 107, 0.5); padding: 10px 12px; border-radius: 12px; }
+        a { color: #9ad0ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+<header>
+    <h1 th:text="${title}">管理員：維護工具</h1>
+    <p class="meta">不連接外部服務時，可用這些工具維持 demo 環境乾淨與可驗證。</p>
+</header>
+<main>
+    <div th:if="${success}" class="ok" th:text="${success}">操作成功</div>
+    <div th:if="${error}" class="err" th:text="${error}">操作失敗</div>
+
+    <section>
+        <h2>目前待清理項目</h2>
+        <ul>
+            <li th:text="${'逾時待付款訂單：' + (snapshot != null ? snapshot.expiredPendingOrders : 0) + ' 筆'}">逾時待付款訂單：0 筆</li>
+            <li th:text="${'超過 7 天通知：' + (snapshot != null ? snapshot.expiredNotifications : 0) + ' 筆'}">超過 7 天通知：0 筆</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>維護操作</h2>
+        <form method="post" action="/employee/admin/tools/expire-orders">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <button type="submit">立即執行逾時訂單檢查</button>
+        </form>
+        <div style="height: 10px;"></div>
+        <form method="post" action="/employee/admin/tools/purge-notifications">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <button type="submit">立即清理過期通知</button>
+        </form>
+        <div style="height: 10px;"></div>
+        <form method="post" action="/employee/admin/tools/reset-todos">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <button type="submit">重置今日待辦為預設值</button>
+        </form>
+    </section>
+
+    <section>
+        <a href="/employee/admin/dashboard">← 回管理中心</a>
+    </section>
+</main>
+</body>
+</html>

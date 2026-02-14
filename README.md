@@ -6,6 +6,25 @@
 - 員工後台（每日待辦、影廳檢查表、維修申請流程）
 - 管理員功能（角色管理、場次管理 CRUD/停用）
 - 會員點數（累積 + 兌換扣點）
+- API 防刷限流 + Trace Id 錯誤追蹤
+
+## 架構快覽
+
+```text
+Browser (Vue SPA + Thymeleaf)
+        |
+Spring MVC Controller
+        |
+Service (訂票/付款/通知/點數/營運)
+        |
+JdbcTemplate + MySQL
+        |
+Flyway Migration
+```
+
+補充文件：
+- 架構說明：`docs/architecture.md`
+- Demo 劇本：`docs/demo-script.md`
 
 ## 1. 環境需求
 
@@ -106,3 +125,22 @@ GitHub Actions：
 - `.github/workflows/ci.yml`
 - 觸發：push / pull request 到 `main` 或 `master`
 - 任務：`mvn -B clean test`
+
+## 9. 不接外部服務的完整度設計
+
+本專案預設不依賴真實金流、Email、SMS，改採：
+
+- `app.payment.provider=mock`：付款成功/失敗/逾時可切換
+- `app.notification.provider=inapp`：站內通知替代外部推播
+- 管理頁維護工具：可手動執行過期訂單/通知清理
+
+## 10. Demo 資料重置
+
+可使用腳本清空交易資料（保留帳號與角色）：
+
+```bash
+DB_URL='jdbc:mysql://localhost:3306/cinema?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Taipei&useUnicode=true&characterEncoding=utf8' \
+DB_USERNAME='' \
+DB_PASSWORD='' \
+./scripts/reset-dev-demo-data.sh
+```

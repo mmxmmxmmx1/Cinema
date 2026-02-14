@@ -202,8 +202,8 @@ class MovieServiceTest {
     }
 
     @Test
-    @DisplayName("座位佈局應該包含已預訂和可用座位")
-    void shouldHaveBothReservedAndAvailableSeats() {
+    @DisplayName("在沒有真實訂單時，座位佈局應該全部可用")
+    void shouldHaveAllSeatsAvailableWithoutPersistedTickets() {
         // Given
         String movieId = "mv-01";
         String showtimeId = "mv-01-st1";
@@ -219,8 +219,8 @@ class MovieServiceTest {
                 .filter(seat -> !seat.isReserved())
                 .count();
 
-        assertTrue(reservedCount > 0, "應該有已預訂的座位");
-        assertTrue(availableCount > 0, "應該有可用的座位");
+        assertEquals(0, reservedCount, "沒有真實訂單時不應有預設佔位");
+        assertEquals(96, availableCount, "沒有真實訂單時應全部可用");
         assertEquals(96, reservedCount + availableCount, "總座位數應該是 96");
     }
 

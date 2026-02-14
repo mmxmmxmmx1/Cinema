@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>站內通知</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/member-area.css">
+</head>
+<body class="member-area">
+<header class="member-header">
+    <h1>站內通知</h1>
+    <p class="member-subtitle">
+        未讀
+        <strong th:text="${unreadCount}">0</strong>
+        則
+    </p>
+</header>
+<main class="member-main">
+    <div th:if="${success}" class="member-flash" th:text="${success}" style="background: rgba(88, 255, 161, 0.16); border: 1px solid rgba(88, 255, 161, 0.35); color: #ccffe5;">操作成功</div>
+    <div th:if="${error}" class="member-flash error" th:text="${error}">操作失敗</div>
+
+    <section class="member-card">
+        <form method="get" action="/member/notifications" class="member-actions" style="align-items: end;">
+            <div>
+                <label for="category">分類</label>
+                <select id="category" name="category">
+                    <option value="ALL" th:selected="${category == 'ALL'}">全部</option>
+                    <option value="ORDER" th:selected="${category == 'ORDER'}">訂單</option>
+                    <option value="PAYMENT" th:selected="${category == 'PAYMENT'}">付款</option>
+                    <option value="POINT" th:selected="${category == 'POINT'}">點數</option>
+                    <option value="SYSTEM" th:selected="${category == 'SYSTEM'}">系統</option>
+                </select>
+            </div>
+            <div>
+                <label for="state">狀態</label>
+                <select id="state" name="state">
+                    <option value="all" th:selected="${state == 'all'}">全部</option>
+                    <option value="unread" th:selected="${state == 'unread'}">未讀</option>
+                    <option value="read" th:selected="${state == 'read'}">已讀</option>
+                </select>
+            </div>
+            <div>
+                <label for="limit">筆數</label>
+                <select id="limit" name="limit">
+                    <option value="20" th:selected="${limit == 20}">20</option>
+                    <option value="50" th:selected="${limit == 50}">50</option>
+                    <option value="100" th:selected="${limit == 100}">100</option>
+                </select>
+            </div>
+            <button class="member-btn" type="submit">套用篩選</button>
+        </form>
+        <form method="post" action="/member/notifications/read-all" style="margin-top: 12px;">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <button class="member-btn" type="submit">全部標記為已讀</button>
+        </form>
+    </section>
+
+    <section class="member-card" th:if="${notifications == null || #lists.isEmpty(notifications)}">
+        目前沒有符合條件的通知。
+    </section>
+
+    <ul class="member-list" th:if="${notifications != null && !#lists.isEmpty(notifications)}">
+        <li class="member-card" th:each="n : ${notifications}">
+            <div class="member-order-head">
+                <strong class="member-order-primary" th:text="${n.title}">通知標題</strong>
+                <span class="member-pill" th:text="${n.read ? '已讀' : '未讀'}">未讀</span>
+                <span class="member-meta" th:text="${n.category}">ORDER</span>
+            </div>
+            <div class="member-order-secondary" th:text="${n.message}">通知內容</div>
+            <div class="member-meta" th:text="${'建立：' + n.createdAt}">建立：2026-02-12 13:00</div>
+            <div class="member-meta" th:if="${n.readAt != null && !#strings.isEmpty(n.readAt)}" th:text="${'已讀：' + n.readAt}">已讀：2026-02-12 13:05</div>
+            <form method="post" th:if="${!n.read}" th:action="@{'/member/notifications/' + ${n.id} + '/read'}" style="margin-top: 8px;">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                <button class="member-btn" type="submit">標記已讀</button>
+            </form>
+        </li>
+    </ul>
+
+    <section class="member-card">
+        <a href="/member">← 回會員專區</a>
+        <span style="margin-left: 12px;"></span>
+        <a href="/">回到購票首頁</a>
+    </section>
+</main>
+</body>
+</html>

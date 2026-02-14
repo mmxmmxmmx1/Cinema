@@ -462,15 +462,7 @@ public class MovieService {
     }
 
     private List<SeatStatus> generateSeats(String movieId, String showtimeId) {
-        Random random = new Random(showtimeId.hashCode());
         Map<String, Boolean> reservedLookup = new HashMap<>();
-        int reservedSeats = 15 + random.nextInt(10);
-
-        while (reservedLookup.size() < reservedSeats) {
-            int row = random.nextInt(ROW_COUNT);
-            int col = random.nextInt(COLUMN_COUNT);
-            reservedLookup.putIfAbsent(buildSeatId(row, col), Boolean.TRUE);
-        }
 
         // Overlay real booked seats (persisted purchases).
         if (jdbcTemplate != null) {

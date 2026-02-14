@@ -348,6 +348,45 @@ public class MemberOrderService {
                 .toList();
     }
 
+    public List<OrderSummaryResponse> listAllOrders(String memberUsername, int limit) {
+        User member = loadMember(memberUsername);
+        int safeLimit = Math.max(1, Math.min(500, limit));
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT mo.id, mo.movie_id, mo.showtime_id, mo.auditorium, mo.total_qty, mo.total_price, mo.status, " +
+                        "mo.created_at, mo.paid_at, " +
+                        "MIN(mt.show_start_at) AS show_start_at, MIN(mt.show_date) AS show_date " +
+                        "FROM member_orders mo " +
+                        "LEFT JOIN member_tickets mt ON mt.order_id = mo.id " +
+                        "WHERE mo.member_id = ? " +
+                        "GROUP BY mo.id, mo.movie_id, mo.showtime_id, mo.auditorium, mo.total_qty, mo.total_price, mo.status, mo.created_at, mo.paid_at " +
+                        "ORDER BY mo.created_at DESC LIMIT " + safeLimit,
+                member.getId());
+
+        return rows.stream().map(row -> {
+            String movieId = String.valueOf(row.get("movie_id"));
+            String showtimeId = String.valueOf(row.get("showtime_id"));
+            Instant showStartAt = resolveShowStartInstant(movieId, showtimeId, row.get("show_start_at"), row.get("show_date"));
+            if (showStartAt == null) {
+                try {
+                    showStartAt = movieService.resolveShowStartInstant(movieId, showtimeId);
+                } catch (Exception ex) {
+                    showStartAt = null;
+                }
+            }
+            return new OrderSummaryResponse(
+                    ((Number) row.get("id")).longValue(),
+                    movieId,
+                    showtimeId,
+                    String.valueOf(row.get("auditorium")),
+                    ((Number) row.get("total_qty")).intValue(),
+                    ((Number) row.get("total_price")).intValue(),
+                    String.valueOf(row.get("status")),
+                    toInstant(row.get("created_at")),
+                    toInstant(row.get("paid_at")),
+                    showStartAt);
+        }).toList();
+    }
+
     public List<OrderSummaryResponse> listActiveOrders(String memberUsername, int limit) {
         User member = loadMember(memberUsername);
         int safeLimit = Math.max(1, Math.min(20, limit));

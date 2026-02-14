@@ -34,15 +34,19 @@
         <div class="metric-grid">
             <div class="metric-card">
                 <h3>總銷售額</h3>
-                <p>NT$ 1,280,000</p>
+                <p th:text="${'NT$ ' + (adminMetrics != null ? #numbers.formatInteger(adminMetrics.todayRevenue, 1, 'COMMA') : '0')}">NT$ 0</p>
             </div>
             <div class="metric-card">
                 <h3>累計觀影人次</h3>
-                <p>3,842</p>
+                <p th:text="${adminMetrics != null ? #numbers.formatInteger(adminMetrics.todayAudience, 1, 'COMMA') : '0'}">0</p>
             </div>
             <div class="metric-card">
                 <h3>當日退票</h3>
-                <p>12</p>
+                <p th:text="${adminMetrics != null ? adminMetrics.todayCancel : 0}">0</p>
+            </div>
+            <div class="metric-card">
+                <h3>7 日內角色異動</h3>
+                <p th:text="${adminMetrics != null ? adminMetrics.roleChanges7d : 0}">0</p>
             </div>
         </div>
     </section>
@@ -58,23 +62,14 @@
             </tr>
             </thead>
             <tbody>
-            <tr>
-                <td>ROLE_ADMIN</td>
-                <td>管理者</td>
-                <td>4</td>
-                <td>2025-10-09 18:32</td>
+            <tr th:if="${adminMetrics != null && adminMetrics.roleSummary != null}" th:each="r : ${adminMetrics.roleSummary}">
+                <td th:text="${r.role_code}">ADMIN</td>
+                <td th:text="${r.role_name}">管理者</td>
+                <td th:text="${r.member_count}">0</td>
+                <td>即時統計</td>
             </tr>
-            <tr>
-                <td>ROLE_EMPLOYEE</td>
-                <td>影城員工</td>
-                <td>28</td>
-                <td>2025-10-11 09:14</td>
-            </tr>
-            <tr>
-                <td>ROLE_IT</td>
-                <td>IT 維運</td>
-                <td>6</td>
-                <td>2025-10-10 22:05</td>
+            <tr th:if="${adminMetrics == null || adminMetrics.roleSummary == null || #lists.isEmpty(adminMetrics.roleSummary)}">
+                <td colspan="4">目前沒有角色統計資料</td>
             </tr>
             </tbody>
         </table>
@@ -92,6 +87,10 @@
             <li><a href="/employee/admin/roles">角色管理（demo）</a></li>
             <li><a href="/employee/admin/showtimes">場次管理（新增/停用）</a></li>
             <li><a href="/employee/admin/audit">稽核監控（最近 24 小時）</a></li>
+            <li>
+                <a href="/employee/admin/tools">維護工具（清理過期資料）</a>
+                <span th:if="${cleanupSnapshot != null}" th:text="${' · 待清理：逾時訂單 ' + cleanupSnapshot.expiredPendingOrders + ' 筆，過期通知 ' + cleanupSnapshot.expiredNotifications + ' 筆'}"></span>
+            </li>
         </ul>
     </section>
     <form class="logout" method="post" action="/employee/logout">

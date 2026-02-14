@@ -9,6 +9,6 @@ public record ApiError(
         String error,
         String message,
         String path,
-        Map<String, Object> details) {
+        Map<String, Object> details,
+        String traceId) {
 }
-

@@ -31,18 +31,22 @@
         <div class="status-grid">
             <div class="status-card">
                 <h3>API 可用率</h3>
-                <p>99.97%</p>
+                <p th:text="${(itMetrics != null ? itMetrics.apiAvailabilityPercent : 100) + '%'}">100%</p>
             </div>
             <div class="status-card">
-                <h3>平均回應時間</h3>
-                <p>182 ms</p>
+                <h3>24h 事件數</h3>
+                <p th:text="${itMetrics != null ? itMetrics.totalEvents24h : 0}">0</p>
             </div>
             <div class="status-card">
-                <h3>錯誤率</h3>
-                <p>0.12%</p>
+                <h3>24h 失敗事件</h3>
+                <p th:text="${itMetrics != null ? itMetrics.failedEvents24h : 0}">0</p>
+            </div>
+            <div class="status-card">
+                <h3>付款失敗率（24h）</h3>
+                <p th:text="${(itMetrics != null ? itMetrics.paymentFailRatePercent : 0) + '%'}">0%</p>
             </div>
         </div>
-        <button type="button">觸發健康檢查</button>
+        <a href="/employee/admin/audit">前往稽核監控</a>
     </section>
     <section>
         <h2>最近部署與維護</h2>

@@ -3,6 +3,7 @@ package com.example.cinema.service;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -34,7 +35,7 @@ public class MemberNotificationService {
             JdbcTemplate jdbcTemplate,
             UserDao userDao,
             NotificationSender notificationSender,
-            @Value("${app.notification.retention-days:7}") int retentionDays) {
+            @Value("${app.notification.retention-days:30}") int retentionDays) {
         this.jdbcTemplate = jdbcTemplate;
         this.userDao = userDao;
         this.notificationSender = notificationSender;
@@ -82,28 +83,70 @@ public class MemberNotificationService {
     }
 
     public List<MemberNotificationResponse> listForMember(String memberUsername, int limit) {
+        return listForMember(memberUsername, limit, null, null);
+    }
+
+    public List<MemberNotificationResponse> listForMember(
+            String memberUsername,
+            int limit,
+            String category,
+            Boolean unreadOnly) {
         User member = userDao.findMemberByUsername(memberUsername)
                 .orElseThrow(() -> new TicketPurchaseRuleViolationException("找不到會員帳號。"));
 
         int safeLimit = Math.max(1, Math.min(100, limit));
         Instant cutoff = notificationCutoff();
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+        String safeCategory = normalizeCategory(category);
+
+        StringBuilder sql = new StringBuilder(
                 "SELECT id, category, title, message, created_at, read_at FROM notifications " +
-                        "WHERE member_id = ? AND created_at >= ? " +
-                        "ORDER BY created_at DESC LIMIT " + safeLimit,
-                member.getId(),
-                Timestamp.from(cutoff));
+                        "WHERE member_id = ? AND created_at >= ?");
+        List<Object> args = new ArrayList<>();
+        args.add(member.getId());
+        args.add(Timestamp.from(cutoff));
+
+        if (safeCategory != null) {
+            sql.append(" AND category = ?");
+            args.add(safeCategory);
+        }
+        if (Boolean.TRUE.equals(unreadOnly)) {
+            sql.append(" AND read_at IS NULL");
+        } else if (Boolean.FALSE.equals(unreadOnly)) {
+            sql.append(" AND read_at IS NOT NULL");
+        }
+        sql.append(" ORDER BY created_at DESC LIMIT ").append(safeLimit);
+
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql.toString(), args.toArray());
 
         return rows.stream().map(this::toDto).toList();
     }
 
-    public void markRead(String memberUsername, long notificationId) {
+    public int markRead(String memberUsername, long notificationId) {
         User member = userDao.findMemberByUsername(memberUsername)
                 .orElseThrow(() -> new TicketPurchaseRuleViolationException("找不到會員帳號。"));
 
-        jdbcTemplate.update(
+        return jdbcTemplate.update(
                 "UPDATE notifications SET read_at = NOW() WHERE id = ? AND member_id = ? AND read_at IS NULL",
                 notificationId, member.getId());
+    }
+
+    public int markAllRead(String memberUsername) {
+        User member = userDao.findMemberByUsername(memberUsername)
+                .orElseThrow(() -> new TicketPurchaseRuleViolationException("找不到會員帳號。"));
+        return jdbcTemplate.update(
+                "UPDATE notifications SET read_at = NOW() WHERE member_id = ? AND read_at IS NULL",
+                member.getId());
+    }
+
+    public int unreadCount(String memberUsername) {
+        User member = userDao.findMemberByUsername(memberUsername)
+                .orElseThrow(() -> new TicketPurchaseRuleViolationException("找不到會員帳號。"));
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM notifications WHERE member_id = ? AND read_at IS NULL AND created_at >= ?",
+                Integer.class,
+                member.getId(),
+                Timestamp.from(notificationCutoff()));
+        return count == null ? 0 : Math.max(0, count.intValue());
     }
 
     @Scheduled(fixedDelayString = "${app.notification.cleanup-ms:3600000}")
@@ -153,5 +196,22 @@ public class MemberNotificationService {
 
     private Instant notificationCutoff() {
         return AppClock.nowInstant().minus(retentionDays, ChronoUnit.DAYS);
+    }
+
+    private String normalizeCategory(String category) {
+        if (category == null) {
+            return null;
+        }
+        String safe = category.trim().toUpperCase();
+        if (safe.isEmpty()) {
+            return null;
+        }
+        if ("ALL".equals(safe)) {
+            return null;
+        }
+        if (!safe.matches("[A-Z_]+")) {
+            return null;
+        }
+        return safe;
     }
 }
