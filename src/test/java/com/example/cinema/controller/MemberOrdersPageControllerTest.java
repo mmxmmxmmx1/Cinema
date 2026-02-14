@@ -53,13 +53,13 @@ class MemberOrdersPageControllerTest {
     @Test
     @DisplayName("取消訂單違規時應顯示錯誤訊息")
     void shouldShowErrorWhenCancelRejected() throws Exception {
-        doThrow(new TicketPurchaseRuleViolationException("開演前 30 分鐘內不可取消訂單。"))
+        doThrow(new TicketPurchaseRuleViolationException("開演前 30 分鐘內與開演後不可取消訂單。"))
                 .when(memberOrderService).cancelOrder(nullable(String.class), anyLong());
 
         mockMvc.perform(post("/member/orders/100/cancel").with(csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(view().name("redirect:/member/orders"))
-                .andExpect(flash().attribute("error", "開演前 30 分鐘內不可取消訂單。"));
+                .andExpect(flash().attribute("error", "開演前 30 分鐘內與開演後不可取消訂單。"));
     }
 
     @Test

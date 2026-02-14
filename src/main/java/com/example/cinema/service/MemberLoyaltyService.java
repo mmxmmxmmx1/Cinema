@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
@@ -41,10 +42,16 @@ public class MemberLoyaltyService {
         if (!isPointLedgerEnabled()) {
             return legacyCurrentPoints(member.getId());
         }
-        Integer balance = jdbcTemplate.queryForObject(
-                "SELECT points_balance FROM member_point_balance WHERE member_id = ?",
-                Integer.class,
-                member.getId());
+        Integer balance;
+        try {
+            balance = jdbcTemplate.queryForObject(
+                    "SELECT points_balance FROM member_point_balance WHERE member_id = ?",
+                    Integer.class,
+                    member.getId());
+        } catch (EmptyResultDataAccessException ex) {
+            // New members may not have a balance row yet; treat as 0 points.
+            balance = 0;
+        }
         return Math.max(0, balance == null ? 0 : balance.intValue());
     }
 

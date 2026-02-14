@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -32,6 +33,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @Tag(name = "User Service", description = "處理用戶註冊、認證和個人資料管理")
 public class UserService {
     private static final Logger logger = LoggerFactory.getLogger(UserService.class);
+    private static final Pattern ACCOUNT_PATTERN = Pattern.compile("^[A-Za-z0-9]+$");
 
     private final UserDao userDao;
     private final PasswordEncoder passwordEncoder;
@@ -62,18 +64,21 @@ public class UserService {
             @Parameter(description = "明文密碼", required = true) String rawPassword,
             @Parameter(description = "用戶類型") UserType userType,
             @Parameter(description = "是否為管理員") boolean asAdmin) {
-        
-        logger.info("開始註冊用戶: {}", username);
+
+        String safeUsername = normalizeUsername(username);
+        validateAccountName(safeUsername);
+
+        logger.info("開始註冊用戶: {}", safeUsername);
         try {
             UserType effectiveType = (userType == null) ? UserType.MEMBER : userType;
             String hash = passwordEncoder.encode(rawPassword);
-            Long userId = userDao.createUser(username, hash, effectiveType);
+            Long userId = userDao.createUser(safeUsername, hash, effectiveType);
 
             // This project models employee roles via employee.role_id -> roles.code.
             // Member logins use the MEMBER role implicitly (see UserDao.MemberMapper).
             if (effectiveType == UserType.EMPLOYEE && asAdmin) {
                 userDao.assignRole(userId, "ADMIN");
-                logger.info("已為用戶 {} 分配管理員權限", username);
+                logger.info("已為用戶 {} 分配管理員權限", safeUsername);
             } else if (effectiveType == UserType.MEMBER && asAdmin) {
                 logger.warn("忽略 member 註冊的 asAdmin=true：管理/IT/主管身分需建立員工帳號。");
             }
@@ -82,11 +87,11 @@ public class UserService {
             return userId;
             
         } catch (DuplicateKeyException e) {
-            String errorMsg = String.format("用戶名 %s 已存在", username);
+            String errorMsg = String.format("用戶名 %s 已存在", safeUsername);
             logger.warn(errorMsg);
             throw new UserRegistrationException(errorMsg, e);
         } catch (Exception e) {
-            String errorMsg = String.format("註冊用戶 %s 時發生錯誤", username);
+            String errorMsg = String.format("註冊用戶 %s 時發生錯誤", safeUsername);
             logger.error(errorMsg, e);
             throw new UserRegistrationException(errorMsg, e);
         }
@@ -107,23 +112,42 @@ public class UserService {
     public Long registerEmployee(
             @Parameter(description = "員工用戶名", required = true) String username,
             @Parameter(description = "明文密碼", required = true) String rawPassword) {
-        
-        logger.info("開始註冊員工: {}", username);
+
+        String safeUsername = normalizeUsername(username);
+        validateAccountName(safeUsername);
+
+        logger.info("開始註冊員工: {}", safeUsername);
         try {
             String hash = passwordEncoder.encode(rawPassword);
-            Long userId = userDao.createUser(username, hash, UserType.EMPLOYEE);
+            Long userId = userDao.createUser(safeUsername, hash, UserType.EMPLOYEE);
             
             logger.info("員工註冊成功，用戶ID: {}", userId);
             return userId;
             
         } catch (DuplicateKeyException e) {
-            String errorMsg = String.format("員工用戶名 %s 已存在", username);
+            String errorMsg = String.format("員工用戶名 %s 已存在", safeUsername);
             logger.warn(errorMsg);
             throw new UserRegistrationException(errorMsg, e);
         } catch (Exception e) {
-            String errorMsg = String.format("註冊員工 %s 時發生錯誤", username);
+            String errorMsg = String.format("註冊員工 %s 時發生錯誤", safeUsername);
             logger.error(errorMsg, e);
             throw new UserRegistrationException(errorMsg, e);
+        }
+    }
+
+    private static String normalizeUsername(String username) {
+        return username == null ? "" : username.trim();
+    }
+
+    private static void validateAccountName(String username) {
+        if (username.isBlank()) {
+            throw new UserRegistrationException("用戶名不可為空");
+        }
+        if (username.length() > 100) {
+            throw new UserRegistrationException("用戶名長度不可超過 100");
+        }
+        if (!ACCOUNT_PATTERN.matcher(username).matches()) {
+            throw new UserRegistrationException("用戶名只能使用英文與數字");
         }
     }
 

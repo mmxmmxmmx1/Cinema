@@ -113,15 +113,20 @@ public class PageController {
         sessionService.updateLastActivity(session, Realm.MEMBER);
         populateMemberModel(model);
 
-        // Recent orders shown in the member area (best-effort; don't break the page if DB is unavailable).
-        try {
-            String username = authentication == null ? null : authentication.getName();
-            if (username != null && !username.isBlank()) {
+        String username = authentication == null ? null : authentication.getName();
+        if (username != null && !username.isBlank()) {
+            try {
                 MemberLoyaltyService loyaltyService = memberLoyaltyServiceProvider.getIfAvailable();
                 if (loyaltyService != null) {
                     model.addAttribute("memberPoints", loyaltyService.currentPoints(username));
                 }
+            } catch (Exception ex) {
+                // Keep member page usable even if loyalty data fails.
+                model.addAttribute("memberPoints", 0);
+            }
 
+            // Recent orders shown in the member area (best-effort; don't break the page if DB is unavailable).
+            try {
                 MemberOrderService memberOrderService = memberOrderServiceProvider.getIfAvailable();
                 if (memberOrderService != null) {
                     model.addAttribute("activeOrders",
@@ -131,13 +136,12 @@ public class PageController {
                     model.addAttribute("upcomingBookings",
                             memberOrderService.listUpcomingBookings(username, 1));
                 }
+            } catch (Exception ex) {
+                model.addAttribute("orderLoadError", "訂單暫時無法顯示，請稍後再試。");
             }
-        } catch (Exception ex) {
-            model.addAttribute("orderLoadError", "無法載入訂單（資料庫可能尚未啟動）。");
         }
 
         try {
-            String username = authentication == null ? null : authentication.getName();
             if (username != null && !username.isBlank()) {
                 MemberNotificationService notificationService = memberNotificationServiceProvider.getIfAvailable();
                 if (notificationService != null) {

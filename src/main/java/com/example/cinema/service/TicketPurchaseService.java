@@ -3,7 +3,11 @@ package com.example.cinema.service;
 import java.time.Instant;
 import java.sql.Date;
 import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +23,7 @@ import com.example.cinema.config.AppClock;
 import com.example.cinema.dao.UserDao;
 import com.example.cinema.exception.TicketPurchaseConflictException;
 import com.example.cinema.exception.TicketPurchaseRuleViolationException;
+import com.example.cinema.model.Showtime;
 import com.example.cinema.model.ShowtimeDetails;
 import com.example.cinema.model.User;
 
@@ -26,7 +31,8 @@ import com.example.cinema.model.User;
 public class TicketPurchaseService {
 
     private static final int MAX_TICKETS_PER_ORDER = 4;
-    private static final int MAX_TICKETS_PER_6H_WINDOW = 4;
+    private static final int MAX_TICKETS_PER_ACTIVE_WINDOW = 4;
+    private static final int DEFAULT_SHOW_DURATION_MINUTES = 120;
 
     private final JdbcTemplate jdbcTemplate;
     private final UserDao userDao;
@@ -79,7 +85,7 @@ public class TicketPurchaseService {
             throw new TicketPurchaseConflictException("座位已被預訂：" + String.join(", ", blocked));
         }
 
-        enforceSixHourSingleAuditoriumRule(member.getId(), auditorium, requested.size());
+        enforceActiveShowtimeSingleAuditoriumRule(member.getId(), auditorium, requested.size());
 
         Instant purchasedAt = AppClock.nowInstant();
         Date operationalDate = Date.valueOf(movieService.currentOperationalDate());
@@ -98,38 +104,78 @@ public class TicketPurchaseService {
         return new PurchaseResult(movieId, showtimeId, auditorium, List.copyOf(requested), purchasedAt);
     }
 
-    private void enforceSixHourSingleAuditoriumRule(long memberId, String requestedAuditorium, int requestedCount) {
-        // 6 小時內只能在同一個影廳購買，且累積最多 4 張。
+    private void enforceActiveShowtimeSingleAuditoriumRule(long memberId, String requestedAuditorium, int requestedCount) {
         List<Map<String, Object>> grouped = jdbcTemplate.queryForList(
-                "SELECT auditorium, COUNT(*) AS cnt " +
+                "SELECT movie_id, showtime_id, auditorium, COUNT(*) AS cnt, MIN(show_start_at) AS show_start_at " +
                         "FROM member_tickets " +
-                        "WHERE member_id = ? AND purchased_at >= (NOW() - INTERVAL 6 HOUR) " +
-                        "GROUP BY auditorium",
+                        "WHERE member_id = ? " +
+                        "GROUP BY movie_id, showtime_id, auditorium",
                 memberId);
 
-        if (grouped.size() > 1) {
-            throw new TicketPurchaseRuleViolationException("你在最近 6 小時內已跨影廳購買過票，請等滿 6 小時後再購買。");
+        Instant now = AppClock.nowInstant();
+        Map<String, Integer> activeByAuditorium = new HashMap<>();
+        int activeCount = 0;
+
+        for (Map<String, Object> row : grouped) {
+            Instant showStartAt = toInstant(row.get("show_start_at"));
+            if (showStartAt == null) {
+                continue;
+            }
+            String movieId = String.valueOf(row.get("movie_id"));
+            String showtimeId = String.valueOf(row.get("showtime_id"));
+            int durationMinutes = movieService.getShowtime(movieId, showtimeId)
+                    .map(Showtime::getDurationMinutes)
+                    .map(duration -> Math.max(1, duration))
+                    .orElse(DEFAULT_SHOW_DURATION_MINUTES);
+            Instant showEndAt = showStartAt.plus(durationMinutes, ChronoUnit.MINUTES);
+            if (!showEndAt.isAfter(now)) {
+                continue;
+            }
+            int count = ((Number) row.get("cnt")).intValue();
+            String auditorium = String.valueOf(row.get("auditorium"));
+            activeByAuditorium.merge(auditorium, count, Integer::sum);
+            activeCount += count;
         }
 
-        if (grouped.size() == 1) {
-            String existingAuditorium = String.valueOf(grouped.get(0).get("auditorium"));
+        if (activeByAuditorium.size() > 1) {
+            throw new TicketPurchaseRuleViolationException("你目前有未結束場次且分布於不同影廳，請待場次結束後再購買。");
+        }
+
+        if (activeByAuditorium.size() == 1) {
+            String existingAuditorium = activeByAuditorium.keySet().iterator().next();
             if (!existingAuditorium.equals(requestedAuditorium)) {
                 throw new TicketPurchaseRuleViolationException(
-                        "最近 6 小時內只能在同一個影廳購買（你目前已在 " + existingAuditorium + " 買過票）。");
+                        "你目前仍有未結束場次，僅能在同一影廳購買（目前影廳：" + existingAuditorium + "）。");
             }
         }
 
-        Integer existingCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM member_tickets " +
-                        "WHERE member_id = ? AND purchased_at >= (NOW() - INTERVAL 6 HOUR)",
-                Integer.class,
-                memberId);
-        int already = existingCount == null ? 0 : existingCount.intValue();
-        if (already + requestedCount > MAX_TICKETS_PER_6H_WINDOW) {
-            int remaining = Math.max(0, MAX_TICKETS_PER_6H_WINDOW - already);
+        if (activeCount + requestedCount > MAX_TICKETS_PER_ACTIVE_WINDOW) {
+            int remaining = Math.max(0, MAX_TICKETS_PER_ACTIVE_WINDOW - activeCount);
             throw new TicketPurchaseRuleViolationException(
-                    "最近 6 小時內最多只能買 4 張票（你已買 " + already + " 張，剩餘可買 " + remaining + " 張）。");
+                    "目前未結束場次最多只能持有 4 張票（你已持有 " + activeCount + " 張，剩餘可買 " + remaining + " 張）。");
         }
+    }
+
+    private static Instant toInstant(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Instant instant) {
+            return instant;
+        }
+        if (value instanceof Timestamp ts) {
+            return ts.toInstant();
+        }
+        if (value instanceof LocalDateTime localDateTime) {
+            return localDateTime.atZone(AppClock.zoneId()).toInstant();
+        }
+        if (value instanceof LocalDate localDate) {
+            return localDate.atStartOfDay(AppClock.zoneId()).toInstant();
+        }
+        if (value instanceof java.util.Date date) {
+            return date.toInstant();
+        }
+        return null;
     }
 
     public record PurchaseResult(

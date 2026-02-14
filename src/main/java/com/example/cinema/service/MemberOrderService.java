@@ -48,7 +48,8 @@ public class MemberOrderService {
     private static final Logger log = LoggerFactory.getLogger(MemberOrderService.class);
 
     private static final int MAX_TICKETS_PER_ORDER = 4;
-    private static final int MAX_TICKETS_PER_6H_WINDOW = 4;
+    private static final int MAX_TICKETS_PER_ACTIVE_WINDOW = 4;
+    private static final int DEFAULT_SHOW_DURATION_MINUTES = 120;
     private static final int UNIT_PRICE = 300;
     private static final DateTimeFormatter SHOW_START_FORMATTER = DateTimeFormatter.ofPattern("MM/dd HH:mm")
             .withZone(AppClock.zoneId());
@@ -101,7 +102,7 @@ public class MemberOrderService {
         String auditorium = details.getShowtime().getAuditorium();
 
         assertSeatsAvailable(details, requested);
-        enforceSixHourSingleAuditoriumRule(member.getId(), auditorium, requested.size());
+        enforceActiveShowtimeSingleAuditoriumRule(member.getId(), auditorium, requested.size());
 
         int totalPrice = UNIT_PRICE * requested.size();
         KeyHolder keyHolder = new GeneratedKeyHolder();
@@ -234,7 +235,7 @@ public class MemberOrderService {
             }
 
             assertSeatsAvailable(details, seatIds);
-            enforceSixHourSingleAuditoriumRule(member.getId(), auditorium, seatIds.size());
+            enforceActiveShowtimeSingleAuditoriumRule(member.getId(), auditorium, seatIds.size());
 
             PaymentMode effectiveMode = mode == null ? PaymentMode.SUCCESS : mode;
             long paymentTxId = insertPaymentTransaction(orderId, member.getId(), totalPrice, effectiveMode);
@@ -317,7 +318,7 @@ public class MemberOrderService {
             }
             Instant cancelDeadline = showStartAt.minus(30, ChronoUnit.MINUTES);
             if (!AppClock.nowInstant().isBefore(cancelDeadline)) {
-                throw new TicketPurchaseRuleViolationException("開演前 30 分鐘內不可取消訂單。");
+                throw new TicketPurchaseRuleViolationException("開演前 30 分鐘內與開演後不可取消訂單。");
             }
         }
 
@@ -889,24 +890,28 @@ public class MemberOrderService {
         Instant direct = toInstant(rawShowStartAt);
         LocalDate showDate = toLocalDate(rawShowDate);
 
-        if (direct != null) {
-            LocalTime localTime = direct.atZone(AppClock.zoneId()).toLocalTime();
-            if (!(localTime.equals(LocalTime.MIDNIGHT) && showDate != null)) {
-                return direct;
+        // Prefer show_date + configured showtime start.
+        // This avoids DATETIME timezone conversion drift between DB/driver/app zones.
+        if (showDate != null) {
+            LocalTime start = movieService.getShowtime(movieId, showtimeId)
+                    .map(showtime -> parseShowtimeStart(showtime.getStartTime()))
+                    .orElse(null);
+            if (start != null) {
+                return ZonedDateTime.of(showDate, start, AppClock.zoneId()).toInstant();
             }
         }
+        return direct;
+    }
 
-        if (showDate == null) {
-            return direct;
+    private static LocalTime parseShowtimeStart(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
         }
-
-        LocalTime start = movieService.getShowtime(movieId, showtimeId)
-                .map(showtime -> LocalTime.parse(showtime.getStartTime()))
-                .orElse(null);
-        if (start == null) {
-            return direct;
+        try {
+            return LocalTime.parse(value.trim());
+        } catch (Exception ex) {
+            return null;
         }
-        return ZonedDateTime.of(showDate, start, AppClock.zoneId()).toInstant();
     }
 
     private static Set<String> normalizeSeatIds(Collection<String> seatIds) {
@@ -923,39 +928,58 @@ public class MemberOrderService {
         return requested;
     }
 
-    private void enforceSixHourSingleAuditoriumRule(long memberId, String requestedAuditorium, int requestedCount) {
-        Timestamp windowStart = Timestamp.from(AppClock.nowInstant().minus(6, ChronoUnit.HOURS));
+    private void enforceActiveShowtimeSingleAuditoriumRule(long memberId, String requestedAuditorium, int requestedCount) {
         List<Map<String, Object>> grouped = jdbcTemplate.queryForList(
-                "SELECT auditorium, COUNT(*) AS cnt " +
+                "SELECT mt.movie_id, mt.showtime_id, mt.auditorium, COUNT(*) AS cnt, " +
+                        "MIN(mt.show_start_at) AS show_start_at, MIN(mt.show_date) AS show_date " +
                         "FROM member_tickets mt " +
-                        "WHERE mt.member_id = ? AND mt.purchased_at >= ? " +
+                        "WHERE mt.member_id = ? " +
                         "AND (mt.order_id IS NULL OR EXISTS (SELECT 1 FROM member_orders mo WHERE mo.id = mt.order_id AND mo.status = 'PAID')) " +
-                        "GROUP BY auditorium",
-                memberId, windowStart);
+                        "GROUP BY mt.movie_id, mt.showtime_id, mt.auditorium",
+                memberId);
 
-        if (grouped.size() > 1) {
-            throw new TicketPurchaseRuleViolationException("你在最近 6 小時內已跨影廳購買過票，請等滿 6 小時後再購買。");
+        Instant now = AppClock.nowInstant();
+        Map<String, Integer> activeByAuditorium = new HashMap<>();
+        int activeCount = 0;
+
+        for (Map<String, Object> row : grouped) {
+            String movieId = String.valueOf(row.get("movie_id"));
+            String showtimeId = String.valueOf(row.get("showtime_id"));
+            Instant showStartAt = resolveShowStartInstant(movieId, showtimeId, row.get("show_start_at"), row.get("show_date"));
+            if (showStartAt == null) {
+                continue;
+            }
+
+            int durationMinutes = movieService.getShowtime(movieId, showtimeId)
+                    .map(showtime -> Math.max(1, showtime.getDurationMinutes()))
+                    .orElse(DEFAULT_SHOW_DURATION_MINUTES);
+            Instant showEndAt = showStartAt.plus(durationMinutes, ChronoUnit.MINUTES);
+            if (!showEndAt.isAfter(now)) {
+                continue;
+            }
+
+            int count = ((Number) row.get("cnt")).intValue();
+            String auditorium = String.valueOf(row.get("auditorium"));
+            activeByAuditorium.merge(auditorium, count, Integer::sum);
+            activeCount += count;
         }
 
-        if (grouped.size() == 1) {
-            String existingAuditorium = String.valueOf(grouped.get(0).get("auditorium"));
+        if (activeByAuditorium.size() > 1) {
+            throw new TicketPurchaseRuleViolationException("你目前有未結束場次且分布於不同影廳，請待場次結束後再購買。");
+        }
+
+        if (activeByAuditorium.size() == 1) {
+            String existingAuditorium = activeByAuditorium.keySet().iterator().next();
             if (!existingAuditorium.equals(requestedAuditorium)) {
                 throw new TicketPurchaseRuleViolationException(
-                        "最近 6 小時內只能在同一個影廳購買（你目前已在 " + existingAuditorium + " 買過票）。");
+                        "你目前仍有未結束場次，僅能在同一影廳購買（目前影廳：" + existingAuditorium + "）。");
             }
         }
 
-        Integer existingCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM member_tickets mt " +
-                        "WHERE mt.member_id = ? AND mt.purchased_at >= ? " +
-                        "AND (mt.order_id IS NULL OR EXISTS (SELECT 1 FROM member_orders mo WHERE mo.id = mt.order_id AND mo.status = 'PAID'))",
-                Integer.class,
-                memberId, windowStart);
-        int already = existingCount == null ? 0 : existingCount.intValue();
-        if (already + requestedCount > MAX_TICKETS_PER_6H_WINDOW) {
-            int remaining = Math.max(0, MAX_TICKETS_PER_6H_WINDOW - already);
+        if (activeCount + requestedCount > MAX_TICKETS_PER_ACTIVE_WINDOW) {
+            int remaining = Math.max(0, MAX_TICKETS_PER_ACTIVE_WINDOW - activeCount);
             throw new TicketPurchaseRuleViolationException(
-                    "最近 6 小時內最多只能買 4 張票（你已買 " + already + " 張，剩餘可買 " + remaining + " 張）。");
+                    "目前未結束場次最多只能持有 4 張票（你已持有 " + activeCount + " 張，剩餘可買 " + remaining + " 張）。");
         }
     }
 

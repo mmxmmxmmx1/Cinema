@@ -1,10 +1,13 @@
 package com.example.cinema.controller;
 
 import com.example.cinema.dto.UpcomingBookingResponse;
+import com.example.cinema.exception.UserRegistrationException;
+import com.example.cinema.model.User.UserType;
 import com.example.cinema.service.MemberLoyaltyService;
 import com.example.cinema.service.MemberOrderService;
 import com.example.cinema.service.SessionService;
 import com.example.cinema.service.SessionService.Realm;
+import com.example.cinema.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -43,6 +46,8 @@ class MemberApiControllerTest {
     private MemberLoyaltyService memberLoyaltyService;
     @MockBean
     private MemberOrderService memberOrderService;
+    @MockBean
+    private UserService userService;
 
     private MockHttpSession session;
 
@@ -154,5 +159,48 @@ class MemberApiControllerTest {
                 .session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(3));
+    }
+
+    @Test
+    @DisplayName("非會員可透過公開 API 註冊會員")
+    @WithMockUser
+    void shouldRegisterMemberByPublicApi() throws Exception {
+        when(userService.registerUser("newmember", "test123", UserType.MEMBER, false)).thenReturn(99L);
+
+        mockMvc.perform(post("/api/auth/member/register")
+                .with(csrf())
+                .contentType("application/json")
+                .content("{\"nickname\":\"newmember\",\"password\":\"test123\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.userId").value(99))
+                .andExpect(jsonPath("$.nickname").value("newmember"))
+                .andExpect(jsonPath("$.message").value("會員註冊成功"));
+    }
+
+    @Test
+    @DisplayName("會員註冊遇到重複帳號應回傳 409")
+    @WithMockUser
+    void shouldReturnConflictWhenMemberNicknameDuplicated() throws Exception {
+        when(userService.registerUser("test123", "test123", UserType.MEMBER, false))
+                .thenThrow(new UserRegistrationException("用戶名 test123 已存在"));
+
+        mockMvc.perform(post("/api/auth/member/register")
+                .with(csrf())
+                .contentType("application/json")
+                .content("{\"nickname\":\"test123\",\"password\":\"test123\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("用戶名 test123 已存在"));
+    }
+
+    @Test
+    @DisplayName("會員註冊帳號含中文或符號時應回傳 400")
+    @WithMockUser
+    void shouldReturnBadRequestWhenNicknameContainsInvalidCharacters() throws Exception {
+        mockMvc.perform(post("/api/auth/member/register")
+                .with(csrf())
+                .contentType("application/json")
+                .content("{\"nickname\":\"測試_123\",\"password\":\"test123\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.fields.nickname").value("nickname 只能使用英文與數字"));
     }
 }

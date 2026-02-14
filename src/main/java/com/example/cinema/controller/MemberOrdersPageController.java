@@ -282,7 +282,7 @@ public class MemberOrdersPageController {
         }
         Instant deadline = showStartAt.minus(30, ChronoUnit.MINUTES);
         if (!AppClock.nowInstant().isBefore(deadline)) {
-            return new CancelPolicy(false, "開演前 30 分鐘內不可取消。");
+            return new CancelPolicy(false, "開演前 30 分鐘內與開演後不可取消。");
         }
         return new CancelPolicy(true, null);
     }

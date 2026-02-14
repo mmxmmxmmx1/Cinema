@@ -77,7 +77,7 @@
                 <button type="submit" class="member-btn member-danger">取消訂單</button>
             </form>
             <span class="member-meta" th:if="${!order.cancellable && order.cancelHint != null && !#strings.isEmpty(order.cancelHint)}"
-                  th:text="${order.cancelHint}">開演前 30 分鐘內不可取消。</span>
+                  th:text="${order.cancelHint}">開演前 30 分鐘內與開演後不可取消。</span>
             <a href="/member/orders">← 回訂單列表</a>
             <a href="/member">回會員專區</a>
             <a href="/">回到購票首頁</a>

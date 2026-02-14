@@ -6,13 +6,18 @@ import java.util.Set;
 
 import com.example.cinema.dto.AuthStatusResponse;
 import com.example.cinema.dto.MemberBooking;
+import com.example.cinema.dto.MemberRegisterRequest;
+import com.example.cinema.dto.MemberRegisterResponse;
 import com.example.cinema.dto.MemberSummary;
+import com.example.cinema.model.User.UserType;
 import com.example.cinema.service.MemberLoyaltyService;
 import com.example.cinema.service.MemberOrderService;
 import com.example.cinema.service.SessionService;
 import com.example.cinema.service.SessionService.Realm;
+import com.example.cinema.service.UserService;
 
 import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +27,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -32,14 +38,17 @@ public class MemberApiController {
     private final SessionService sessionService;
     private final MemberLoyaltyService memberLoyaltyService;
     private final MemberOrderService memberOrderService;
+    private final UserService userService;
 	
     public MemberApiController(
             SessionService sessionService,
             MemberLoyaltyService memberLoyaltyService,
-            MemberOrderService memberOrderService) {
+            MemberOrderService memberOrderService,
+            UserService userService) {
         this.sessionService = sessionService;
         this.memberLoyaltyService = memberLoyaltyService;
         this.memberOrderService = memberOrderService;
+        this.userService = userService;
     }
 
     @GetMapping("/auth/member")
@@ -63,6 +72,15 @@ public class MemberApiController {
 
         // Backward compatibility: `authenticated` means "logged in as MEMBER".
         return ResponseEntity.ok(new AuthStatusResponse(isMember, username, isMember, isEmployee, roles));
+    }
+
+    @PostMapping("/auth/member/register")
+    public ResponseEntity<MemberRegisterResponse> registerMember(
+            @Valid @RequestBody MemberRegisterRequest request) {
+        String nickname = request.nickname() == null ? "" : request.nickname().trim();
+        long userId = userService.registerUser(nickname, request.password(), UserType.MEMBER, false);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new MemberRegisterResponse(userId, nickname, "會員註冊成功"));
     }
 
     @PostMapping("/guest/watchlist/{movieId}")

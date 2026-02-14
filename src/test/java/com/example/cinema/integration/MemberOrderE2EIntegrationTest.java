@@ -276,6 +276,19 @@ class MemberOrderE2EIntegrationTest {
     }
 
     @Test
+    @DisplayName("開演後不可取消已付款訂單")
+    void shouldRejectCancelAfterShowStarted() throws Exception {
+        List<String> seats = pickAvailableSeats(1);
+        OrderDetailResponse created = memberOrderService.createOrder(MEMBER, MOVIE_ID, SHOWTIME_ID, seats);
+        OrderDetailResponse paid = memberOrderService.payOrder(MEMBER, created.orderId(), "SUCCESS");
+        assertEquals("PAID", paid.status());
+
+        setTestClock(ZonedDateTime.of(2026, 2, 12, 9, 10, 0, 0, ZONE).toInstant());
+        assertThrows(TicketPurchaseRuleViolationException.class,
+                () -> memberOrderService.cancelOrder(MEMBER, created.orderId()));
+    }
+
+    @Test
     @DisplayName("單筆訂單超過 4 張應被拒絕")
     void shouldRejectMoreThanFourTicketsPerOrder() {
         List<String> seats = pickAvailableSeats(5);

@@ -44,6 +44,14 @@ public class ApiExceptionHandler {
         return build(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request, null);
     }
 
+    @ExceptionHandler(UserRegistrationException.class)
+    public ResponseEntity<ApiError> userRegistration(UserRegistrationException ex, HttpServletRequest request) {
+        HttpStatus status = ex.getMessage() != null && ex.getMessage().contains("已存在")
+                ? HttpStatus.CONFLICT
+                : HttpStatus.BAD_REQUEST;
+        return build(status, ex.getMessage(), request, null);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> validation(MethodArgumentNotValidException ex, HttpServletRequest request) {
         Map<String, Object> details = new LinkedHashMap<>();

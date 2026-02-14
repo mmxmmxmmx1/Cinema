@@ -84,7 +84,7 @@
                         <button type="submit" class="member-btn member-danger">取消訂單</button>
                     </form>
                     <span class="member-meta" th:if="${!o.cancellable && o.cancelHint != null && !#strings.isEmpty(o.cancelHint)}"
-                          th:text="${o.cancelHint}">開演前 30 分鐘內不可取消。</span>
+                          th:text="${o.cancelHint}">開演前 30 分鐘內與開演後不可取消。</span>
                 </div>
             </li>
         </ul>

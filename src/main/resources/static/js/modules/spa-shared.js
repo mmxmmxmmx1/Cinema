@@ -124,14 +124,71 @@
 
   const GlobalAuthWidget = {
     data() {
-      return { actionError: null };
+      return {
+        actionError: null,
+        showRegisterModal: false,
+        registerSubmitting: false,
+        registerError: null,
+        registerSuccess: null,
+        registerForm: {
+          nickname: '',
+          password: '',
+          confirmPassword: ''
+        }
+      };
     },
     template: `
-      <div class="floating-buttons">
-        <a class="floating-button login" :href="memberEntryHref">{{ memberEntryLabel }}</a>
-        <button v-if="auth.member" type="button" class="floating-button logout" @click="logoutMember">會員登出</button>
-        <a class="floating-button employee" :href="employeeEntryHref">{{ employeeEntryLabel }}</a>
-        <span v-if="actionError" class="auth-hint" style="color:#ff9a9a;">{{ actionError }}</span>
+      <div>
+        <div class="floating-buttons">
+          <a class="floating-button login" :href="memberEntryHref">{{ memberEntryLabel }}</a>
+          <button
+            v-if="!auth.member"
+            type="button"
+            class="floating-button register"
+            @click="openRegisterModal"
+          >
+            加入會員
+          </button>
+          <button v-if="auth.member" type="button" class="floating-button logout" @click="logoutMember">會員登出</button>
+          <a class="floating-button employee" :href="employeeEntryHref">{{ employeeEntryLabel }}</a>
+          <span v-if="actionError" class="auth-hint" style="color:#ff9a9a;">{{ actionError }}</span>
+        </div>
+
+        <div v-if="showRegisterModal" class="auth-modal-mask">
+          <div class="auth-modal" role="dialog" aria-modal="true" aria-label="加入會員">
+            <div class="auth-modal-head">
+              <h3>加入會員</h3>
+              <button type="button" class="auth-modal-close" @click="closeRegisterModal" aria-label="關閉">×</button>
+            </div>
+            <p class="auth-modal-subtitle">註冊後可使用會員專區、訂單紀錄與點數功能。</p>
+
+            <form class="auth-register-form" @submit.prevent="submitRegister">
+              <label>
+                帳號
+                <input v-model.trim="registerForm.nickname" type="text" maxlength="100" pattern="[A-Za-z0-9]+" autocomplete="username" placeholder="例如：newmember" required>
+                <small style="color:#9fb4ea;">僅限英文與數字（不可使用中文或符號）</small>
+              </label>
+              <label>
+                密碼
+                <input v-model="registerForm.password" type="password" maxlength="100" autocomplete="new-password" placeholder="請輸入密碼" required>
+              </label>
+              <label>
+                確認密碼
+                <input v-model="registerForm.confirmPassword" type="password" maxlength="100" autocomplete="new-password" placeholder="再次輸入密碼" required>
+              </label>
+
+              <div v-if="registerError" class="auth-modal-message error">{{ registerError }}</div>
+              <div v-if="registerSuccess" class="auth-modal-message success">{{ registerSuccess }}</div>
+
+              <div class="auth-register-actions">
+                <button type="submit" class="floating-button register submit" :disabled="registerSubmitting">
+                  {{ registerSubmitting ? '註冊中…' : '建立會員' }}
+                </button>
+                <a class="floating-button login" :href="memberLoginHref">前往會員登入</a>
+              </div>
+            </form>
+          </div>
+        </div>
       </div>
     `,
     computed: {
@@ -170,6 +227,21 @@
       }
     },
     methods: {
+      openRegisterModal() {
+        this.showRegisterModal = true;
+        this.registerError = null;
+        this.registerSuccess = null;
+        document.body.classList.add('auth-modal-open');
+      },
+      closeRegisterModal() {
+        this.showRegisterModal = false;
+        this.registerSubmitting = false;
+        this.registerError = null;
+        this.registerSuccess = null;
+        this.registerForm.password = '';
+        this.registerForm.confirmPassword = '';
+        document.body.classList.remove('auth-modal-open');
+      },
       getCookie(name) {
         const target = name + '=';
         const parts = document.cookie ? document.cookie.split(';') : [];
@@ -180,9 +252,112 @@
         return null;
       },
       async ensureCsrfCookie() {
+        let token = null;
         try {
-          await fetch('/api/csrf', { credentials: 'same-origin' });
+          const res = await fetch('/api/csrf', {
+            method: 'GET',
+            credentials: 'same-origin',
+            cache: 'no-store'
+          });
+          if (res.ok) {
+            const data = await res.json();
+            token = data && typeof data.token === 'string' ? data.token : null;
+            if (token && !this.getCookie('XSRF-TOKEN')) {
+              document.cookie = `XSRF-TOKEN=${encodeURIComponent(token)}; path=/; SameSite=Lax`;
+            }
+          }
         } catch (_) {}
+        return token || this.getCookie('XSRF-TOKEN');
+      },
+      async readApiErrorMessage(response, fallbackMessage) {
+        let message = fallbackMessage;
+        try {
+          const contentType = (response.headers && response.headers.get('content-type')) || '';
+          if (contentType.includes('application/json')) {
+            const data = await response.json();
+            if (data && typeof data.message === 'string' && data.message.trim()) {
+              return data.message.trim();
+            }
+            const fields = data && data.details && data.details.fields;
+            if (fields && typeof fields === 'object') {
+              const firstKey = Object.keys(fields)[0];
+              if (firstKey && fields[firstKey]) {
+                return String(fields[firstKey]);
+              }
+            }
+            return message;
+          }
+          const text = await response.text();
+          if (text && text.trim() && !/<!doctype html/i.test(text)) {
+            return text.trim().slice(0, 300);
+          }
+        } catch (_) {}
+        return message;
+      },
+      async submitRegister() {
+        if (this.registerSubmitting) return;
+        this.registerError = null;
+        this.registerSuccess = null;
+
+        const nickname = (this.registerForm.nickname || '').trim();
+        const password = this.registerForm.password || '';
+        const confirmPassword = this.registerForm.confirmPassword || '';
+        if (!nickname) {
+          this.registerError = '請輸入帳號。';
+          return;
+        }
+        if (!/^[A-Za-z0-9]+$/.test(nickname)) {
+          this.registerError = '帳號只能使用英文與數字。';
+          return;
+        }
+        if (!password) {
+          this.registerError = '請輸入密碼。';
+          return;
+        }
+        if (password !== confirmPassword) {
+          this.registerError = '兩次輸入的密碼不一致。';
+          return;
+        }
+
+        this.registerSubmitting = true;
+        try {
+          let xsrf = await this.ensureCsrfCookie();
+
+          const doRegister = async (token) => {
+            return fetch('/api/auth/member/register', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { 'X-XSRF-TOKEN': token } : {})
+              },
+              body: JSON.stringify({ nickname, password })
+            });
+          };
+
+          let res = await doRegister(xsrf);
+          if (res.status === 403) {
+            xsrf = await this.ensureCsrfCookie();
+            res = await doRegister(xsrf);
+          }
+
+          if (!res.ok) {
+            let message = await this.readApiErrorMessage(res, '註冊失敗，請稍後再試。');
+            if (res.status === 403 && (!message || message === 'Forbidden')) {
+              message = 'CSRF token 無效或已過期，請重新整理頁面後再試。';
+            }
+            this.registerError = message;
+            return;
+          }
+
+          this.registerSuccess = '註冊成功，請使用新帳號登入會員。';
+          this.registerForm.password = '';
+          this.registerForm.confirmPassword = '';
+        } catch (err) {
+          this.registerError = (err && err.message) ? err.message : '註冊失敗，請稍後再試。';
+        } finally {
+          this.registerSubmitting = false;
+        }
       },
       async logoutMember() {
         this.actionError = null;
@@ -208,6 +383,9 @@
     },
     async mounted() {
       await refreshMemberAuth();
+    },
+    unmounted() {
+      document.body.classList.remove('auth-modal-open');
     }
   };
 
