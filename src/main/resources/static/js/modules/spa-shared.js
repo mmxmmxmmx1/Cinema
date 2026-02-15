@@ -509,14 +509,188 @@
   };
 
   const Hero = {
+    props: {
+      slides: {
+        type: Array,
+        default: () => []
+      },
+      autoPlayMs: {
+        type: Number,
+        default: 4500
+      }
+    },
+    data() {
+      return {
+        activeIndex: 0,
+        autoPlayTimer: null,
+        hovering: false
+      };
+    },
+    computed: {
+      normalizedSlides() {
+        const raw = Array.isArray(this.slides) ? this.slides : [];
+        const valid = raw.filter((item) => item && typeof item === 'object');
+        if (valid.length > 0) {
+          return valid.map((slide, index) => ({
+            key: slide.key || `slide-${index}`,
+            movieId: slide.movieId != null ? slide.movieId : null,
+            title: slide.title || '現正熱映',
+            subtitle: slide.subtitle || '每個顧客都可以睡得很安穩',
+            imageUrl: slide.imageUrl || '/images/sleep.jpg'
+          }));
+        }
+        return [
+          {
+            key: 'fallback-slide',
+            movieId: null,
+            title: '很好睡電影院',
+            subtitle: '每個顧客都可以睡得很安穩',
+            imageUrl: '/images/sleep.jpg'
+          }
+        ];
+      },
+      canNavigate() {
+        return this.normalizedSlides.length > 1;
+      },
+      trackStyle() {
+        return { transform: `translateX(-${this.activeIndex * 100}%)` };
+      }
+    },
+    watch: {
+      normalizedSlides(nextSlides) {
+        if (!Array.isArray(nextSlides) || nextSlides.length === 0) {
+          this.activeIndex = 0;
+          this.stopAutoPlay();
+          return;
+        }
+        if (this.activeIndex >= nextSlides.length) {
+          this.activeIndex = 0;
+        }
+        this.restartAutoPlay();
+      }
+    },
+    methods: {
+      goToSlide(index) {
+        if (!this.canNavigate) return;
+        const max = this.normalizedSlides.length;
+        if (index < 0 || index >= max) return;
+        this.activeIndex = index;
+      },
+      nextSlide() {
+        if (!this.canNavigate) return;
+        this.activeIndex = (this.activeIndex + 1) % this.normalizedSlides.length;
+      },
+      prevSlide() {
+        if (!this.canNavigate) return;
+        this.activeIndex = (this.activeIndex - 1 + this.normalizedSlides.length) % this.normalizedSlides.length;
+      },
+      stopAutoPlay() {
+        if (this.autoPlayTimer) {
+          clearInterval(this.autoPlayTimer);
+          this.autoPlayTimer = null;
+        }
+      },
+      startAutoPlay() {
+        this.stopAutoPlay();
+        if (!this.canNavigate) return;
+        this.autoPlayTimer = setInterval(() => {
+          if (!this.hovering) {
+            this.nextSlide();
+          }
+        }, Math.max(2500, this.autoPlayMs));
+      },
+      restartAutoPlay() {
+        this.startAutoPlay();
+      },
+      onMouseEnter() {
+        this.hovering = true;
+      },
+      onMouseLeave() {
+        this.hovering = false;
+      },
+      onImageError(event) {
+        if (event && event.target) {
+          event.target.src = '/images/sleep.jpg';
+        }
+      }
+    },
+    mounted() {
+      this.startAutoPlay();
+    },
+    beforeUnmount() {
+      this.stopAutoPlay();
+    },
     template: `
-      <header class="hero">
+      <header
+        class="hero hero-carousel"
+        @mouseenter="onMouseEnter"
+        @mouseleave="onMouseLeave"
+      >
         <div class="hero-inner">
           <span class="hero-label">現正熱映中</span>
           <img class="hero-badge" src="/images/sleep.jpg" alt="Very Sleepy Cinema 徽章">
           <div class="hero-text">
             <h1>很好睡電影院</h1>
             <p style="color: #0044BB;">每個顧客都可以睡得很安穩</p>
+          </div>
+        </div>
+
+        <div class="hero-carousel-wrap">
+          <div class="hero-carousel-viewport">
+            <div class="hero-carousel-track" :style="trackStyle">
+              <article class="hero-slide" v-for="(slide, index) in normalizedSlides" :key="slide.key">
+                <img
+                  class="hero-slide-image"
+                  :src="slide.imageUrl"
+                  :alt="slide.title"
+                  loading="eager"
+                  @error="onImageError"
+                >
+                <div class="hero-slide-overlay"></div>
+                <div class="hero-slide-content">
+                  <h2 class="hero-slide-title">{{ slide.title }}</h2>
+                  <p class="hero-slide-subtitle">{{ slide.subtitle }}</p>
+                  <router-link
+                    v-if="slide.movieId !== null"
+                    class="hero-slide-cta"
+                    :to="'/movies/' + slide.movieId"
+                  >
+                    詳閱場次
+                  </router-link>
+                </div>
+              </article>
+            </div>
+
+            <button
+              v-if="canNavigate"
+              type="button"
+              class="hero-nav hero-nav-prev"
+              aria-label="上一張"
+              @click="prevSlide"
+            >
+              ‹
+            </button>
+            <button
+              v-if="canNavigate"
+              type="button"
+              class="hero-nav hero-nav-next"
+              aria-label="下一張"
+              @click="nextSlide"
+            >
+              ›
+            </button>
+          </div>
+
+          <div v-if="canNavigate" class="hero-dots" aria-label="輪播指示">
+            <button
+              v-for="(slide, index) in normalizedSlides"
+              :key="'dot-' + slide.key"
+              type="button"
+              class="hero-dot"
+              :class="{ active: index === activeIndex }"
+              :aria-label="'第 ' + (index + 1) + ' 張'"
+              @click="goToSlide(index)"
+            ></button>
           </div>
         </div>
       </header>

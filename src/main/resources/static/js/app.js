@@ -20,7 +20,7 @@ const {
 const HomePage = {
   template: `
     <div class="app-shell">
-      <Hero />
+      <Hero :slides="heroSlides" />
       <LoadingState v-if="loading" />
       <ErrorState v-else-if="error" :message="error" />
       <section v-else class="movie-grid">
@@ -38,6 +38,20 @@ const HomePage = {
   components: { Hero, LoadingState, ErrorState },
   data() {
     return { movies: [], loading: true, error: null };
+  },
+  computed: {
+    heroSlides() {
+      if (!Array.isArray(this.movies) || this.movies.length === 0) {
+        return [];
+      }
+      return this.movies.slice(0, 5).map((movie, index) => ({
+        key: movie && movie.id != null ? `movie-${movie.id}` : `movie-fallback-${index}`,
+        movieId: movie && movie.id != null ? movie.id : null,
+        title: movie && movie.title ? movie.title : '現正熱映',
+        subtitle: movie && movie.subtitle ? movie.subtitle : '每個顧客都可以睡得很安穩',
+        imageUrl: movie && movie.posterUrl ? movie.posterUrl : '/images/sleep.jpg'
+      }));
+    }
   },
   async mounted() {
     try {
