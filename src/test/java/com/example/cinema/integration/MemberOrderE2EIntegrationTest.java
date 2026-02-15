@@ -41,6 +41,7 @@ class MemberOrderE2EIntegrationTest {
     private static final String MEMBER = "test123";
     private static final String MOVIE_ID = "mv-02";
     private static final String SHOWTIME_ID = "mv-02-st1";
+    private static final String LATER_OTHER_AUDITORIUM_SHOWTIME_ID = "mv-02-st5";
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -297,6 +298,27 @@ class MemberOrderE2EIntegrationTest {
     }
 
     @Test
+    @DisplayName("原場次結束後，應可改買其他影廳的後續場次")
+    void shouldAllowCrossAuditoriumPurchaseAfterCurrentShowEnded() throws Exception {
+        List<String> firstShowSeats = pickAvailableSeats(SHOWTIME_ID, 4);
+        OrderDetailResponse firstOrder = memberOrderService.createOrder(MEMBER, MOVIE_ID, SHOWTIME_ID, firstShowSeats);
+        OrderDetailResponse firstPaid = memberOrderService.payOrder(MEMBER, firstOrder.orderId(), "SUCCESS");
+        assertEquals("PAID", firstPaid.status());
+
+        List<String> otherAuditoriumSeats = pickAvailableSeats(LATER_OTHER_AUDITORIUM_SHOWTIME_ID, 1);
+        assertThrows(TicketPurchaseRuleViolationException.class,
+                () -> memberOrderService.createOrder(MEMBER, MOVIE_ID, LATER_OTHER_AUDITORIUM_SHOWTIME_ID,
+                        otherAuditoriumSeats));
+
+        // mv-02-st1 starts at 08:50 and lasts 180 minutes, so it ends at 11:50.
+        setTestClock(ZonedDateTime.of(2026, 2, 12, 12, 0, 0, 0, ZONE).toInstant());
+
+        OrderDetailResponse secondOrder = memberOrderService.createOrder(
+                MEMBER, MOVIE_ID, LATER_OTHER_AUDITORIUM_SHOWTIME_ID, otherAuditoriumSeats);
+        assertEquals("PENDING", secondOrder.status());
+    }
+
+    @Test
     @DisplayName("舊資料時間異常（00:00）時，訂單頁/會員頁仍應顯示一致的場次時間")
     void shouldKeepShowtimeDateTimeConsistentAcrossViews() {
         List<String> seats = pickAvailableSeats(1);
@@ -327,7 +349,11 @@ class MemberOrderE2EIntegrationTest {
     }
 
     private List<String> pickAvailableSeats(int count) {
-        List<String> seats = movieService.getShowtimeDetails(MOVIE_ID, SHOWTIME_ID)
+        return pickAvailableSeats(SHOWTIME_ID, count);
+    }
+
+    private List<String> pickAvailableSeats(String showtimeId, int count) {
+        List<String> seats = movieService.getShowtimeDetails(MOVIE_ID, showtimeId)
                 .getSeatLayout()
                 .getSeats()
                 .stream()

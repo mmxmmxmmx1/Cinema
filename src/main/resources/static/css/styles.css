@@ -273,11 +273,11 @@ html {
   top: clamp(2.5rem, 6vw, 4rem);
   right: var(--page-padding-x);
   z-index: 2147483000;
-  display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
-  gap: 12px;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: start;
+  width: min(320px, calc(100vw - (var(--page-padding-x) * 2)));
   padding: 12px 14px;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -309,6 +309,66 @@ html {
   cursor: pointer;
   font-family: inherit;
   line-height: 1.2;
+  white-space: nowrap;
+}
+
+.floating-dropdown {
+  position: relative;
+  display: flex;
+  width: 100%;
+}
+
+.floating-button.menu-trigger {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.36rem 0.66rem;
+  font-size: 0.8rem;
+  border-radius: 12px;
+}
+
+.floating-button.menu-trigger::after {
+  content: "▾";
+  font-size: 0.68rem;
+  opacity: 0.85;
+  margin-left: 0.3rem;
+}
+
+.floating-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 100%;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(14, 20, 40, 0.96);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.floating-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0.52rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(74, 144, 226, 0.16);
+  color: #e8f0ff;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.floating-menu-item:hover {
+  background: rgba(74, 144, 226, 0.28);
+  transform: translateY(-1px);
 }
 
 .floating-button.login {
@@ -450,6 +510,7 @@ html {
 }
 
 .floating-buttons .auth-hint {
+  grid-column: 1 / -1;
   width: 100%;
   margin: 0;
   font-size: 0.84rem;
@@ -903,6 +964,8 @@ html {
     right: var(--page-padding-x);
     gap: 8px;
     padding: 9px 10px;
+    align-items: start;
+    width: min(290px, calc(100vw - (var(--page-padding-x) * 2)));
   }
 
   .auth-modal {

@@ -3,6 +3,7 @@ package com.example.cinema.service;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -11,9 +12,16 @@ import org.springframework.stereotype.Service;
 public class OperationsDashboardService {
 
     private final JdbcTemplate jdbcTemplate;
+    private final int pendingTimeoutMinutes;
+    private final int notificationRetentionDays;
 
-    public OperationsDashboardService(JdbcTemplate jdbcTemplate) {
+    public OperationsDashboardService(
+            JdbcTemplate jdbcTemplate,
+            @Value("${app.order.pending-timeout-minutes:15}") int pendingTimeoutMinutes,
+            @Value("${app.notification.retention-days:30}") int notificationRetentionDays) {
         this.jdbcTemplate = jdbcTemplate;
+        this.pendingTimeoutMinutes = Math.max(1, pendingTimeoutMinutes);
+        this.notificationRetentionDays = Math.max(1, notificationRetentionDays);
     }
 
     public ManagerDashboardMetrics managerMetrics() {
@@ -68,9 +76,10 @@ public class OperationsDashboardService {
     public CleanupSnapshot cleanupSnapshot() {
         int expiredPendingOrders = intQuery(
                 "SELECT COUNT(*) FROM member_orders WHERE status = 'PENDING' " +
-                        "AND created_at < DATE_SUB(NOW(), INTERVAL 15 MINUTE)");
+                        "AND created_at < DATE_SUB(NOW(), INTERVAL " + pendingTimeoutMinutes + " MINUTE)");
         int expiredNotifications = intQuery(
-                "SELECT COUNT(*) FROM notifications WHERE created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)");
+                "SELECT COUNT(*) FROM notifications WHERE created_at < DATE_SUB(NOW(), INTERVAL " +
+                        notificationRetentionDays + " DAY)");
         return new CleanupSnapshot(expiredPendingOrders, expiredNotifications);
     }
 

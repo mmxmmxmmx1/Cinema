@@ -500,6 +500,34 @@ public class MemberOrderService {
         log.info("Expired {} pending order(s).", rows.size());
     }
 
+    @Transactional
+    public OrderRepairSummary repairOrderStatuses() {
+        int pendingToPaid = jdbcTemplate.update(
+                "UPDATE member_orders SET status = 'PAID' " +
+                        "WHERE status IN ('PENDING', 'FAILED') AND paid_at IS NOT NULL");
+
+        int paidToCancelled = jdbcTemplate.update(
+                "UPDATE member_orders SET status = 'CANCELLED' " +
+                        "WHERE status = 'PAID' AND cancelled_at IS NOT NULL");
+
+        Instant threshold = AppClock.nowInstant().minus(pendingTimeoutMinutes, ChronoUnit.MINUTES);
+        int pendingToExpired = jdbcTemplate.update(
+                "UPDATE member_orders SET status = 'EXPIRED', expired_at = COALESCE(expired_at, NOW()), " +
+                        "failure_reason = COALESCE(failure_reason, 'PAYMENT_TIMEOUT') " +
+                        "WHERE status IN ('PENDING', 'FAILED') AND created_at < ?",
+                Timestamp.from(threshold));
+
+        int releasedTickets = jdbcTemplate.update(
+                "DELETE FROM member_tickets " +
+                        "WHERE order_id IN (SELECT id FROM member_orders WHERE status <> 'PAID')");
+
+        return new OrderRepairSummary(
+                pendingToPaid,
+                paidToCancelled,
+                pendingToExpired,
+                releasedTickets);
+    }
+
     private OrderDetailResponse getOrderDetail(long memberId, long orderId) {
         Map<String, Object> row = getOrderRow(orderId);
         long ownerId = ((Number) row.get("member_id")).longValue();
@@ -993,5 +1021,12 @@ public class MemberOrderService {
         NEW,
         IN_PROGRESS,
         SUCCEEDED
+    }
+
+    public record OrderRepairSummary(
+            int pendingToPaid,
+            int paidToCancelled,
+            int pendingToExpired,
+            int releasedTickets) {
     }
 }

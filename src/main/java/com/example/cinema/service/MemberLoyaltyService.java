@@ -79,6 +79,34 @@ public class MemberLoyaltyService {
     }
 
     @Transactional
+    public int recalculateAllMemberPointBalances() {
+        List<Long> memberIds = jdbcTemplate.queryForList("SELECT id FROM members", Long.class);
+        int updatedMembers = 0;
+        for (Long memberId : memberIds) {
+            if (memberId == null) {
+                continue;
+            }
+            int recalculated;
+            if (isPointLedgerEnabled()) {
+                Integer ledgerTotal = jdbcTemplate.queryForObject(
+                        "SELECT COALESCE(SUM(points_delta), 0) FROM member_point_ledger WHERE member_id = ?",
+                        Integer.class,
+                        memberId);
+                recalculated = Math.max(0, ledgerTotal == null ? 0 : ledgerTotal.intValue());
+            } else {
+                recalculated = legacyCurrentPoints(memberId.longValue());
+            }
+            jdbcTemplate.update(
+                    "INSERT INTO member_point_balance (member_id, points_balance) VALUES (?, ?) " +
+                            "ON DUPLICATE KEY UPDATE points_balance = VALUES(points_balance), updated_at = NOW()",
+                    memberId,
+                    recalculated);
+            updatedMembers++;
+        }
+        return updatedMembers;
+    }
+
+    @Transactional
     public int redeem(String memberUsername, String rewardCode) {
         User member = loadMember(memberUsername);
         RewardOption reward = REWARD_OPTIONS.stream()

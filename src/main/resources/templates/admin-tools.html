@@ -30,24 +30,34 @@
         <h2>目前待清理項目</h2>
         <ul>
             <li th:text="${'逾時待付款訂單：' + (snapshot != null ? snapshot.expiredPendingOrders : 0) + ' 筆'}">逾時待付款訂單：0 筆</li>
-            <li th:text="${'超過 7 天通知：' + (snapshot != null ? snapshot.expiredNotifications : 0) + ' 筆'}">超過 7 天通知：0 筆</li>
+            <li th:text="${'超過保留天數通知：' + (snapshot != null ? snapshot.expiredNotifications : 0) + ' 筆'}">超過保留天數通知：0 筆</li>
         </ul>
     </section>
 
     <section>
         <h2>維護操作</h2>
         <form method="post" action="/employee/admin/tools/expire-orders">
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <button type="submit">立即執行逾時訂單檢查</button>
         </form>
         <div style="height: 10px;"></div>
         <form method="post" action="/employee/admin/tools/purge-notifications">
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <button type="submit">立即清理過期通知</button>
         </form>
         <div style="height: 10px;"></div>
+        <form method="post" action="/employee/admin/tools/repair-order-status">
+            <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <button type="submit">修復訂單狀態並釋放異常座位</button>
+        </form>
+        <div style="height: 10px;"></div>
+        <form method="post" action="/employee/admin/tools/recalculate-points">
+            <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <button type="submit">重算所有會員點數</button>
+        </form>
+        <div style="height: 10px;"></div>
         <form method="post" action="/employee/admin/tools/reset-todos">
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <button type="submit">重置今日待辦為預設值</button>
         </form>
     </section>

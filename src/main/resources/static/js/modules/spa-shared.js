@@ -126,6 +126,8 @@
     data() {
       return {
         actionError: null,
+        memberMenuOpen: false,
+        employeeMenuOpen: false,
         showRegisterModal: false,
         registerSubmitting: false,
         registerError: null,
@@ -134,23 +136,68 @@
           nickname: '',
           password: '',
           confirmPassword: ''
-        }
+        },
+        onDocumentClick: null,
+        onEscapeKey: null
       };
     },
     template: `
       <div>
         <div class="floating-buttons">
-          <a class="floating-button login" :href="memberEntryHref">{{ memberEntryLabel }}</a>
-          <button
-            v-if="!auth.member"
-            type="button"
-            class="floating-button register"
-            @click="openRegisterModal"
-          >
-            加入會員
-          </button>
-          <button v-if="auth.member" type="button" class="floating-button logout" @click="logoutMember">會員登出</button>
-          <a class="floating-button employee" :href="employeeEntryHref">{{ employeeEntryLabel }}</a>
+          <div class="floating-dropdown">
+            <button
+              type="button"
+              class="floating-button menu-trigger"
+              :aria-expanded="memberMenuOpen ? 'true' : 'false'"
+              aria-label="會員專區選單"
+              @click.stop="toggleMemberMenu"
+            >
+              {{ memberTriggerLabel }}
+            </button>
+            <div v-if="memberMenuOpen" class="floating-menu">
+              <a class="floating-menu-item" :href="memberEntryHref">{{ memberMenuLinkLabel }}</a>
+              <button
+                v-if="!auth.member"
+                type="button"
+                class="floating-menu-item"
+                @click="openRegisterModal"
+              >
+                申請會員
+              </button>
+              <button
+                v-if="auth.member"
+                type="button"
+                class="floating-menu-item"
+                @click="logoutMember"
+              >
+                登出會員
+              </button>
+            </div>
+          </div>
+
+          <div class="floating-dropdown">
+            <button
+              type="button"
+              class="floating-button menu-trigger"
+              :aria-expanded="employeeMenuOpen ? 'true' : 'false'"
+              aria-label="員工專區選單"
+              @click.stop="toggleEmployeeMenu"
+            >
+              {{ employeeTriggerLabel }}
+            </button>
+            <div v-if="employeeMenuOpen" class="floating-menu">
+              <a class="floating-menu-item" :href="employeeEntryHref">{{ employeeMenuLinkLabel }}</a>
+              <button
+                v-if="auth.employee"
+                type="button"
+                class="floating-menu-item"
+                @click="logoutEmployee"
+              >
+                登出員工
+              </button>
+            </div>
+          </div>
+
           <span v-if="actionError" class="auth-hint" style="color:#ff9a9a;">{{ actionError }}</span>
         </div>
 
@@ -214,20 +261,59 @@
       memberEntryHref() {
         return this.auth.member ? '/member' : this.memberLoginHref;
       },
-      memberEntryLabel() {
-        if (!this.auth.loaded) return '會員';
-        return this.auth.member ? `會員專區：${this.auth.username || '已登入'}` : '會員登入';
+      memberTriggerLabel() {
+        if (!this.auth.loaded) return '會員專區';
+        return this.auth.member ? `會員專區（${this.auth.username || '已登入'}）` : '會員專區';
+      },
+      memberMenuLinkLabel() {
+        if (!this.auth.loaded) return '會員登入';
+        return this.auth.member ? '前往會員專區' : '會員登入';
       },
       employeeEntryHref() {
         return this.auth.employee ? '/employee' : '/employee/login';
       },
-      employeeEntryLabel() {
+      employeeTriggerLabel() {
         if (!this.auth.loaded) return '員工專區';
-        return this.auth.employee ? `員工專區：${this.auth.username || '已登入'}` : '員工專區';
+        return this.auth.employee ? `員工專區（${this.auth.username || '已登入'}）` : '員工專區';
+      },
+      employeeMenuLinkLabel() {
+        if (!this.auth.loaded) return '員工登入';
+        return this.auth.employee ? '前往員工專區' : '員工登入';
       }
     },
     methods: {
+      closeMenus() {
+        this.memberMenuOpen = false;
+        this.employeeMenuOpen = false;
+      },
+      toggleMemberMenu() {
+        this.memberMenuOpen = !this.memberMenuOpen;
+        if (this.memberMenuOpen) {
+          this.employeeMenuOpen = false;
+        }
+      },
+      toggleEmployeeMenu() {
+        this.employeeMenuOpen = !this.employeeMenuOpen;
+        if (this.employeeMenuOpen) {
+          this.memberMenuOpen = false;
+        }
+      },
+      handleOutsideClick(event) {
+        if (!this.$el) return;
+        if (!this.$el.contains(event.target)) {
+          this.closeMenus();
+        }
+      },
+      handleEscape(event) {
+        if (event && event.key === 'Escape') {
+          this.closeMenus();
+          if (this.showRegisterModal) {
+            this.closeRegisterModal();
+          }
+        }
+      },
       openRegisterModal() {
+        this.closeMenus();
         this.showRegisterModal = true;
         this.registerError = null;
         this.registerSuccess = null;
@@ -360,6 +446,7 @@
         }
       },
       async logoutMember() {
+        this.closeMenus();
         this.actionError = null;
         try {
           await this.ensureCsrfCookie();
@@ -379,12 +466,44 @@
         }
         await refreshMemberAuth();
         window.location.href = '/';
+      },
+      async logoutEmployee() {
+        this.closeMenus();
+        this.actionError = null;
+        try {
+          await this.ensureCsrfCookie();
+          const xsrf = this.getCookie('XSRF-TOKEN');
+          const res = await fetch('/employee/logout', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}) }
+          });
+          if (!res.ok && res.status !== 302) {
+            this.actionError = `員工登出失敗（${res.status}）`;
+            return;
+          }
+        } catch (_) {
+          this.actionError = '員工登出失敗，請稍後再試。';
+          return;
+        }
+        await refreshMemberAuth();
+        window.location.href = '/';
       }
     },
     async mounted() {
       await refreshMemberAuth();
+      this.onDocumentClick = this.handleOutsideClick.bind(this);
+      this.onEscapeKey = this.handleEscape.bind(this);
+      document.addEventListener('click', this.onDocumentClick);
+      document.addEventListener('keydown', this.onEscapeKey);
     },
     unmounted() {
+      if (this.onDocumentClick) {
+        document.removeEventListener('click', this.onDocumentClick);
+      }
+      if (this.onEscapeKey) {
+        document.removeEventListener('keydown', this.onEscapeKey);
+      }
       document.body.classList.remove('auth-modal-open');
     }
   };

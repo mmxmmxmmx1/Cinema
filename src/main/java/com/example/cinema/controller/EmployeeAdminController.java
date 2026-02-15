@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.example.cinema.service.EmployeeTodoService;
+import com.example.cinema.service.MemberLoyaltyService;
 import com.example.cinema.service.MemberNotificationService;
 import com.example.cinema.service.MemberOrderService;
 import com.example.cinema.service.OperationsDashboardService;
@@ -25,6 +26,7 @@ public class EmployeeAdminController {
     private final JdbcTemplate jdbcTemplate;
     private final MemberNotificationService memberNotificationService;
     private final MemberOrderService memberOrderService;
+    private final MemberLoyaltyService memberLoyaltyService;
     private final EmployeeTodoService employeeTodoService;
     private final OperationsDashboardService operationsDashboardService;
 
@@ -32,11 +34,13 @@ public class EmployeeAdminController {
             JdbcTemplate jdbcTemplate,
             MemberNotificationService memberNotificationService,
             MemberOrderService memberOrderService,
+            MemberLoyaltyService memberLoyaltyService,
             EmployeeTodoService employeeTodoService,
             OperationsDashboardService operationsDashboardService) {
         this.jdbcTemplate = jdbcTemplate;
         this.memberNotificationService = memberNotificationService;
         this.memberOrderService = memberOrderService;
+        this.memberLoyaltyService = memberLoyaltyService;
         this.employeeTodoService = employeeTodoService;
         this.operationsDashboardService = operationsDashboardService;
     }
@@ -171,6 +175,33 @@ public class EmployeeAdminController {
     public String expirePendingOrders(RedirectAttributes redirectAttributes) {
         memberOrderService.expireTimedOutPendingOrders();
         redirectAttributes.addFlashAttribute("success", "已執行逾時訂單檢查。");
+        return "redirect:/employee/admin/tools";
+    }
+
+    @PostMapping("/tools/repair-order-status")
+    public String repairOrderStatus(RedirectAttributes redirectAttributes) {
+        try {
+            var summary = memberOrderService.repairOrderStatuses();
+            redirectAttributes.addFlashAttribute(
+                    "success",
+                    "訂單修復完成：PENDING→PAID " + summary.pendingToPaid()
+                            + " 筆，PAID→CANCELLED " + summary.paidToCancelled()
+                            + " 筆，逾時→EXPIRED " + summary.pendingToExpired()
+                            + " 筆，釋放票券 " + summary.releasedTickets() + " 張。");
+        } catch (Exception ex) {
+            redirectAttributes.addFlashAttribute("error", "訂單修復失敗，請確認資料庫狀態後再試。");
+        }
+        return "redirect:/employee/admin/tools";
+    }
+
+    @PostMapping("/tools/recalculate-points")
+    public String recalculatePoints(RedirectAttributes redirectAttributes) {
+        try {
+            int updatedMembers = memberLoyaltyService.recalculateAllMemberPointBalances();
+            redirectAttributes.addFlashAttribute("success", "點數重算完成，共更新 " + updatedMembers + " 位會員。");
+        } catch (Exception ex) {
+            redirectAttributes.addFlashAttribute("error", "點數重算失敗，請確認資料庫狀態後再試。");
+        }
         return "redirect:/employee/admin/tools";
     }
 

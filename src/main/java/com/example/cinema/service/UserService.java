@@ -1,9 +1,15 @@
 package com.example.cinema.service;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -16,6 +22,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.cinema.config.AppClock;
 import com.example.cinema.dao.UserDao;
 import com.example.cinema.exception.UserRegistrationException;
 import com.example.cinema.model.User;
@@ -34,10 +41,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public class UserService {
     private static final Logger logger = LoggerFactory.getLogger(UserService.class);
     private static final Pattern ACCOUNT_PATTERN = Pattern.compile("^[A-Za-z0-9]+$");
+    private static final int MIN_PASSWORD_LENGTH = 4;
+    private static final int MAX_PASSWORD_LENGTH = 100;
+    private static final int RESET_TOKEN_EXPIRE_MINUTES = 15;
 
     private final UserDao userDao;
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
+    private final Map<String, PasswordResetToken> memberResetTokens = new ConcurrentHashMap<>();
 
     public UserService(UserDao userDao, PasswordEncoder passwordEncoder, JdbcTemplate jdbcTemplate) {
         this.userDao = userDao;
@@ -135,6 +146,75 @@ public class UserService {
         }
     }
 
+    public String issueMemberPasswordResetToken(String username) {
+        String safeUsername = normalizeUsername(username);
+        validateAccountName(safeUsername);
+        cleanupExpiredResetTokens();
+
+        User member = userDao.findMemberByUsername(safeUsername).orElse(null);
+        if (member == null) {
+            // Do not reveal whether account exists to avoid user enumeration.
+            return null;
+        }
+
+        memberResetTokens.entrySet()
+                .removeIf(entry -> safeUsername.equalsIgnoreCase(entry.getValue().username()));
+
+        String token = generateResetToken();
+        memberResetTokens.put(token, new PasswordResetToken(
+                safeUsername,
+                AppClock.nowInstant().plus(RESET_TOKEN_EXPIRE_MINUTES, ChronoUnit.MINUTES)));
+        return token;
+    }
+
+    @Transactional
+    public void resetMemberPasswordWithToken(String username, String token, String newPassword) {
+        String safeUsername = normalizeUsername(username);
+        validateAccountName(safeUsername);
+        validatePassword(newPassword);
+
+        String safeToken = normalizeResetToken(token);
+        if (safeToken.isBlank()) {
+            throw new UserRegistrationException("重設碼不可為空");
+        }
+
+        cleanupExpiredResetTokens();
+        PasswordResetToken resetToken = memberResetTokens.get(safeToken);
+        Instant now = AppClock.nowInstant();
+        if (resetToken == null || resetToken.expiresAt().isBefore(now)
+                || !safeUsername.equalsIgnoreCase(resetToken.username())) {
+            throw new UserRegistrationException("重設碼無效或已過期");
+        }
+
+        updateMemberPassword(safeUsername, newPassword);
+        memberResetTokens.remove(safeToken);
+    }
+
+    @Transactional
+    public void changeMemberPassword(String username, String currentPassword, String newPassword) {
+        String safeUsername = normalizeUsername(username);
+        validateAccountName(safeUsername);
+        validatePassword(newPassword);
+
+        if (currentPassword == null || currentPassword.isBlank()) {
+            throw new UserRegistrationException("目前密碼不可為空");
+        }
+
+        User member = userDao.findMemberByUsername(safeUsername)
+                .orElseThrow(() -> new UserRegistrationException("找不到會員帳號"));
+
+        if (!passwordEncoder.matches(currentPassword, member.getPassword())) {
+            throw new UserRegistrationException("目前密碼不正確");
+        }
+        if (passwordEncoder.matches(newPassword, member.getPassword())) {
+            throw new UserRegistrationException("新密碼不可與目前密碼相同");
+        }
+
+        updateMemberPassword(safeUsername, newPassword);
+        memberResetTokens.entrySet()
+                .removeIf(entry -> safeUsername.equalsIgnoreCase(entry.getValue().username()));
+    }
+
     private static String normalizeUsername(String username) {
         return username == null ? "" : username.trim();
     }
@@ -149,6 +229,48 @@ public class UserService {
         if (!ACCOUNT_PATTERN.matcher(username).matches()) {
             throw new UserRegistrationException("用戶名只能使用英文與數字");
         }
+    }
+
+    private static void validatePassword(String password) {
+        if (password == null || password.isBlank()) {
+            throw new UserRegistrationException("密碼不可為空");
+        }
+        String safe = password.trim();
+        if (safe.length() < MIN_PASSWORD_LENGTH) {
+            throw new UserRegistrationException("密碼長度至少 " + MIN_PASSWORD_LENGTH + " 碼");
+        }
+        if (safe.length() > MAX_PASSWORD_LENGTH) {
+            throw new UserRegistrationException("密碼長度不可超過 " + MAX_PASSWORD_LENGTH + " 碼");
+        }
+    }
+
+    private void updateMemberPassword(String username, String newPassword) {
+        String hash = passwordEncoder.encode(newPassword);
+        int updated = jdbcTemplate.update(
+                "UPDATE members SET password = ? WHERE nickname = ?",
+                hash,
+                username);
+        if (updated <= 0) {
+            throw new UserRegistrationException("密碼更新失敗，找不到會員帳號");
+        }
+    }
+
+    private static String generateResetToken() {
+        return UUID.randomUUID()
+                .toString()
+                .replace("-", "")
+                .substring(0, 10)
+                .toUpperCase(Locale.ROOT);
+    }
+
+    private static String normalizeResetToken(String token) {
+        return token == null ? "" : token.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private void cleanupExpiredResetTokens() {
+        Instant now = AppClock.nowInstant();
+        memberResetTokens.entrySet()
+                .removeIf(entry -> entry.getValue().expiresAt().isBefore(now));
     }
 
     /**
@@ -220,5 +342,10 @@ public class UserService {
         
         logger.info("成功為用戶 {} 添加了 {} 部新電影到觀看清單", username, addedCount);
     
+    }
+
+    private record PasswordResetToken(
+            String username,
+            Instant expiresAt) {
     }
 }

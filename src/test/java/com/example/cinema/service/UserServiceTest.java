@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.lenient;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
@@ -168,6 +169,73 @@ class UserServiceTest {
             eq(USER_ID),
             eq(3L)
         );
+    }
+
+    @Test
+    void issueMemberPasswordResetToken_ShouldReturnTokenWhenMemberExists() {
+        when(userDao.findMemberByUsername(TEST_USERNAME)).thenReturn(Optional.of(testUser));
+
+        String token = userService.issueMemberPasswordResetToken(TEST_USERNAME);
+
+        assertNotNull(token);
+        assertTrue(token.length() >= 8);
+    }
+
+    @Test
+    void issueMemberPasswordResetToken_ShouldReturnNullWhenMemberNotExists() {
+        when(userDao.findMemberByUsername(TEST_USERNAME)).thenReturn(Optional.empty());
+
+        String token = userService.issueMemberPasswordResetToken(TEST_USERNAME);
+
+        assertNull(token);
+    }
+
+    @Test
+    void resetMemberPasswordWithToken_ShouldUpdatePassword() {
+        when(userDao.findMemberByUsername(TEST_USERNAME)).thenReturn(Optional.of(testUser));
+        when(jdbcTemplate.update(
+                eq("UPDATE members SET password = ? WHERE nickname = ?"),
+                anyString(),
+                eq(TEST_USERNAME)))
+                .thenReturn(1);
+
+        String token = userService.issueMemberPasswordResetToken(TEST_USERNAME);
+        userService.resetMemberPasswordWithToken(TEST_USERNAME, token, "newPassword123");
+
+        verify(jdbcTemplate).update(
+                eq("UPDATE members SET password = ? WHERE nickname = ?"),
+                anyString(),
+                eq(TEST_USERNAME));
+    }
+
+    @Test
+    void changeMemberPassword_ShouldValidateCurrentPasswordAndUpdate() {
+        when(userDao.findMemberByUsername(TEST_USERNAME)).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches("password123", ENCODED_PASSWORD)).thenReturn(true);
+        when(passwordEncoder.matches("newPassword123", ENCODED_PASSWORD)).thenReturn(false);
+        when(jdbcTemplate.update(
+                eq("UPDATE members SET password = ? WHERE nickname = ?"),
+                anyString(),
+                eq(TEST_USERNAME)))
+                .thenReturn(1);
+
+        userService.changeMemberPassword(TEST_USERNAME, "password123", "newPassword123");
+
+        verify(jdbcTemplate).update(
+                eq("UPDATE members SET password = ? WHERE nickname = ?"),
+                anyString(),
+                eq(TEST_USERNAME));
+    }
+
+    @Test
+    void changeMemberPassword_ShouldRejectWrongCurrentPassword() {
+        when(userDao.findMemberByUsername(TEST_USERNAME)).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches("wrong", ENCODED_PASSWORD)).thenReturn(false);
+
+        UserRegistrationException ex = assertThrows(
+                UserRegistrationException.class,
+                () -> userService.changeMemberPassword(TEST_USERNAME, "wrong", "newPassword123"));
+        assertTrue(ex.getMessage().contains("目前密碼不正確"));
     }
     
     // ensureBasicRole 已移除：此專案的 member 角色為隱含 MEMBER；employee 角色由 employee.role_id -> roles.code 決定。

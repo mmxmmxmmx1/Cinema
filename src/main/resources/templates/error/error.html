@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>系統訊息</title>
+    <style>
+        body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #101522; color: #f2f5ff; font-family: "Noto Sans TC", "Segoe UI", Arial, sans-serif; }
+        .panel { width: min(620px, 92%); background: rgba(18, 22, 48, 0.92); border: 1px solid rgba(255,255,255,0.12); border-radius: 18px; padding: 32px; box-shadow: 0 20px 50px rgba(3,6,20,0.65); }
+        h1 { margin: 0 0 12px 0; font-size: 30px; }
+        p { margin: 0 0 10px 0; color: #bac1e6; line-height: 1.6; }
+        a { color: #8ec7ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+<main class="panel">
+    <h1 th:text="${status != null ? status : 500}">500</h1>
+    <p th:text="${error != null ? error : '系統錯誤'}">系統錯誤</p>
+    <p th:text="${message != null && !#strings.isEmpty(message) ? message : '請稍後再試。'}">請稍後再試。</p>
+    <p><a href="/">返回首頁</a></p>
+</main>
+</body>
+</html>

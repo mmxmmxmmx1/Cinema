@@ -226,7 +226,12 @@ public class SecurityConfig {
                                     .collect(Collectors.toList()));
                 })
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/member/login", "/member/login/").permitAll()
+                        .requestMatchers(
+                                "/member/login",
+                                "/member/login/",
+                                "/member/password/forgot",
+                                "/member/password/reset")
+                        .permitAll()
                         .requestMatchers("/member/**").hasRole("MEMBER")
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex.accessDeniedHandler((request, response, accessDeniedException) -> {
