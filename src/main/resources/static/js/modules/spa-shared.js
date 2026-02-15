@@ -535,7 +535,7 @@
             key: slide.key || `slide-${index}`,
             movieId: slide.movieId != null ? slide.movieId : null,
             title: slide.title || '現正熱映',
-            subtitle: slide.subtitle || '每個顧客都可以睡得很安穩',
+            subtitle: slide.subtitle || '',
             imageUrl: slide.imageUrl || '/images/sleep.jpg'
           }));
         }
@@ -544,7 +544,7 @@
             key: 'fallback-slide',
             movieId: null,
             title: '很好睡電影院',
-            subtitle: '每個顧客都可以睡得很安穩',
+            subtitle: '',
             imageUrl: '/images/sleep.jpg'
           }
         ];
@@ -649,7 +649,7 @@
                 <div class="hero-slide-overlay"></div>
                 <div class="hero-slide-content">
                   <h2 class="hero-slide-title">{{ slide.title }}</h2>
-                  <p class="hero-slide-subtitle">{{ slide.subtitle }}</p>
+                  <p v-if="slide.subtitle" class="hero-slide-subtitle">{{ slide.subtitle }}</p>
                   <router-link
                     v-if="slide.movieId !== null"
                     class="hero-slide-cta"

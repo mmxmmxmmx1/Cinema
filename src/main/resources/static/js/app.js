@@ -20,7 +20,7 @@ const {
 const HomePage = {
   template: `
     <div class="app-shell">
-      <Hero :slides="heroSlides" />
+      <Hero v-if="!loading && !error && heroSlides.length > 0" :slides="heroSlides" />
       <LoadingState v-if="loading" />
       <ErrorState v-else-if="error" :message="error" />
       <section v-else class="movie-grid">
@@ -44,11 +44,21 @@ const HomePage = {
       if (!Array.isArray(this.movies) || this.movies.length === 0) {
         return [];
       }
-      return this.movies.slice(0, 5).map((movie, index) => ({
+      const preferredOrder = ['mv-01', 'mv-02', 'mv-03', 'mv-04', 'mv-05'];
+      const byId = new Map(this.movies.map((movie) => [movie && movie.id, movie]));
+      const preferredMovies = preferredOrder
+        .map((id) => byId.get(id))
+        .filter((movie) => movie && movie.posterUrl);
+      const fallbackMovies = this.movies.filter(
+        (movie) => movie && movie.posterUrl && !preferredOrder.includes(movie.id)
+      );
+      const selectedMovies = [...preferredMovies, ...fallbackMovies].slice(0, 5);
+
+      return selectedMovies.map((movie, index) => ({
         key: movie && movie.id != null ? `movie-${movie.id}` : `movie-fallback-${index}`,
         movieId: movie && movie.id != null ? movie.id : null,
         title: movie && movie.title ? movie.title : '現正熱映',
-        subtitle: movie && movie.subtitle ? movie.subtitle : '每個顧客都可以睡得很安穩',
+        subtitle: movie && movie.subtitle ? movie.subtitle : '',
         imageUrl: movie && movie.posterUrl ? movie.posterUrl : '/images/sleep.jpg'
       }));
     }

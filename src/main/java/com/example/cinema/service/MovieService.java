@@ -35,23 +35,23 @@ public class MovieService {
 
     public MovieService() {
         List<Movie> seeds = List.of(
-                createMovie("mv-01", "沙丘:第二部", "", "/images/dune-part-two.jpg",
+                createMovie("mv-01", "沙丘:第二部", "", "https://image.tmdb.org/t/p/original/6izwz7rsy95ARzTR3poZ8H6c5pp.jpg",
                         "保羅亞崔迪與錢妮以及弗瑞曼人聯手,向毀滅他家族的陰謀者展開報復。",
                         showtimes("mv-01", 166, "09:30", "12:15", "15:00", "18:40", "21:25", "23:00")),
 
-                createMovie("mv-02", "奧本海默", "", "/images/cinema1.png",
+                createMovie("mv-02", "奧本海默", "", "https://image.tmdb.org/t/p/original/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg",
                         "羅伯特奧本海默的一生,從他在原子彈研發中的角色,到他面臨的道德困境。",
                         showtimes("mv-02", 180, "08:50", "11:45", "14:30", "17:30", "20:40", "23:00")),
 
-                createMovie("mv-03", "蜘蛛人:穿越新宇宙", "", "/images/spider-verse.jpg",
+                createMovie("mv-03", "蜘蛛人:穿越新宇宙", "", "https://image.tmdb.org/t/p/original/8Vt6mWEReuy4Of61Lnj5Xj704m8.jpg",
                         "邁爾斯摩拉斯再次穿越多重宇宙,與其他蜘蛛人並肩作戰。",
                         showtimes("mv-03", 140, "10:20", "12:40", "15:20", "18:05", "21:10", "23:00")),
 
-                createMovie("mv-04", "星際異攻隊3", "", "https://image.tmdb.org/t/p/w500/r2J02Z2OpNTctfOSN1Ydgii51I3.jpg",
+                createMovie("mv-04", "星際異攻隊3", "", "https://image.tmdb.org/t/p/original/r2J02Z2OpNTctfOSN1Ydgii51I3.jpg",
                         "星爵與他的團隊踏上一場全新的冒險,面對來自宇宙的威脅。",
                         showtimes("mv-04", 150, "09:10", "12:10", "15:10", "18:10", "21:15", "23:00")),
 
-                createMovie("mv-05", "芭比", "", "https://image.tmdb.org/t/p/w500/iuFNMS8U5cb6xfzi51Dbkovj7vM.jpg",
+                createMovie("mv-05", "芭比", "", "https://image.tmdb.org/t/p/original/iuFNMS8U5cb6xfzi51Dbkovj7vM.jpg",
                         "芭比與肯踏上現實世界的旅程,發現真實生活的美好與挑戰。",
                         showtimes("mv-05", 114, "11:00", "13:20", "15:40", "18:00", "20:30", "23:00")),
 
