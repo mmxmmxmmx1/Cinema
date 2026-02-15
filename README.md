@@ -25,6 +25,7 @@ Flyway Migration
 補充文件：
 - 架構說明：`docs/architecture.md`
 - Demo 劇本：`docs/demo-script.md`
+- Flyway 規範：`docs/flyway-migration-rules.md`
 
 ## 1. 環境需求
 
@@ -118,6 +119,25 @@ mvn clean test
 測試包含：
 - Service / Controller 單元測試
 - Integration 測試（電影流程與新功能流程）
+
+### 手動驗證腳本（訂票核心流程）
+
+1. 訂票到付款
+   - 開首頁選擇場次與座位（1~4 張）
+   - 進入結帳頁按「確認付款」
+   - 預期：訂單狀態為 `PAID`，通知出現「訂單已建立 / 付款成功」
+2. 取消訂單與釋位
+   - 進入 `/member/orders` 對可取消訂單按「取消訂單」
+   - 預期：狀態變 `CANCELLED`，原座位可再次被購買
+3. 30 分鐘取消限制
+   - 針對開演前 30 分鐘內或已開演場次嘗試取消
+   - 預期：取消被拒絕並顯示規則訊息
+4. 場次時間一致性
+   - 會員專區「即將欣賞的電影」與「我的訂單」比對同一訂單
+   - 預期：開演日期/時間一致（格式 `MM/dd HH:mm`）
+5. CSRF 與登入身分
+   - 未登入會員直接進入結帳流程
+   - 預期：先導向會員登入；若 token 過期，顯示可理解訊息而非單純 `Forbidden`
 
 ## 8. CI
 

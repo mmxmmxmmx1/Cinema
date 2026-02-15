@@ -3,7 +3,6 @@ package com.example.cinema.controller;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -11,15 +10,16 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.cinema.config.AppClock;
 import com.example.cinema.filter.TraceIdFilter;
+import com.example.cinema.service.SystemHealthService;
 
 @RestController
 @RequestMapping("/api")
 public class SystemHealthController {
 
-    private final JdbcTemplate jdbcTemplate;
+    private final SystemHealthService systemHealthService;
 
-    public SystemHealthController(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public SystemHealthController(SystemHealthService systemHealthService) {
+        this.systemHealthService = systemHealthService;
     }
 
     @GetMapping("/health")
@@ -29,16 +29,7 @@ public class SystemHealthController {
         body.put("time", AppClock.nowInstant().toString());
         body.put("zone", AppClock.zoneId().toString());
         body.put("traceId", traceId);
-        body.put("db", pingDb());
+        body.put("db", systemHealthService.databaseStatus());
         return body;
-    }
-
-    private String pingDb() {
-        try {
-            Integer one = jdbcTemplate.queryForObject("SELECT 1", Integer.class);
-            return one != null && one.intValue() == 1 ? "UP" : "UNKNOWN";
-        } catch (Exception ex) {
-            return "DOWN";
-        }
     }
 }

@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import org.junit.jupiter.api.AfterEach;
@@ -38,6 +39,8 @@ import com.example.cinema.service.MovieService;
 class MemberOrderE2EIntegrationTest {
 
     private static final ZoneId ZONE = ZoneId.of("Asia/Taipei");
+    private static final DateTimeFormatter SHOW_START_LABEL_FORMATTER = DateTimeFormatter.ofPattern("MM/dd HH:mm")
+            .withZone(ZONE);
     private static final String MEMBER = "test123";
     private static final String MOVIE_ID = "mv-02";
     private static final String SHOWTIME_ID = "mv-02-st1";
@@ -287,6 +290,29 @@ class MemberOrderE2EIntegrationTest {
         setTestClock(ZonedDateTime.of(2026, 2, 12, 9, 10, 0, 0, ZONE).toInstant());
         assertThrows(TicketPurchaseRuleViolationException.class,
                 () -> memberOrderService.cancelOrder(MEMBER, created.orderId()));
+    }
+
+    @Test
+    @DisplayName("我的訂單與即將欣賞場次的日期/時間顯示應一致")
+    void shouldKeepShowStartDateTimeConsistentAcrossViews() {
+        List<String> seats = pickAvailableSeats(1);
+        OrderDetailResponse created = memberOrderService.createOrder(MEMBER, MOVIE_ID, SHOWTIME_ID, seats);
+        OrderDetailResponse paid = memberOrderService.payOrder(MEMBER, created.orderId(), "SUCCESS");
+        assertEquals("PAID", paid.status());
+
+        OrderSummaryResponse activeOrder = memberOrderService.listActiveOrders(MEMBER, 10).stream()
+                .filter(o -> o.orderId() == created.orderId())
+                .findFirst()
+                .orElseThrow();
+        UpcomingBookingResponse upcomingBooking = memberOrderService.listUpcomingBookings(MEMBER, 10).stream()
+                .filter(o -> o.orderId() == created.orderId())
+                .findFirst()
+                .orElseThrow();
+
+        assertNotNull(activeOrder.showStartAt());
+        assertNotNull(upcomingBooking.showStartAt());
+        assertEquals(activeOrder.showStartAt(), upcomingBooking.showStartAt());
+        assertEquals(SHOW_START_LABEL_FORMATTER.format(activeOrder.showStartAt()), upcomingBooking.showStartLabel());
     }
 
     @Test

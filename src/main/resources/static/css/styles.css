@@ -21,6 +21,13 @@ html {
 :root {
   --page-max-width: 1200px;
   --page-padding-x: clamp(1.5rem, 5vw, 4rem);
+  --hero-carousel-padding-top: clamp(3rem, 7vw, 4.8rem);
+  --hero-carousel-padding-bottom: clamp(2.2rem, 4.8vw, 3.2rem);
+  --hero-carousel-margin-top: clamp(1.4rem, 2.8vw, 2rem);
+  --hero-carousel-height: clamp(360px, 48vw, 540px);
+  --hero-carousel-radius: 16px;
+  --hero-slide-crop-scale: 1.04;
+  --hero-tagline-color: #0044bb;
 }
 
 /* ========== Hero 頂部區塊（背景延伸到底） ========== */
@@ -157,9 +164,13 @@ html {
   margin: 0;
 }
 
+.hero-tagline {
+  color: var(--hero-tagline-color);
+}
+
 /* ========== Hero Carousel ========== */
 .hero.hero-carousel {
-  padding: clamp(3rem, 7vw, 4.8rem) 0 clamp(2.2rem, 4.8vw, 3.2rem) 0;
+  padding: var(--hero-carousel-padding-top) 0 var(--hero-carousel-padding-bottom) 0;
   height: auto;
   min-height: 0;
   max-height: none;
@@ -173,7 +184,7 @@ html {
 .hero-carousel-wrap {
   position: relative;
   width: 100%;
-  margin-top: clamp(1.4rem, 2.8vw, 2rem);
+  margin-top: var(--hero-carousel-margin-top);
   padding: 0 var(--page-padding-x);
   z-index: 1;
 }
@@ -181,8 +192,8 @@ html {
 .hero-carousel-viewport {
   position: relative;
   width: 100%;
-  height: clamp(360px, 48vw, 540px);
-  border-radius: 16px;
+  height: var(--hero-carousel-height);
+  border-radius: var(--hero-carousel-radius);
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.18);
   box-shadow: 0 14px 28px rgba(0, 0, 0, 0.35);
@@ -212,8 +223,9 @@ html {
   object-fit: cover;
   object-position: center;
   display: block;
-  transform: scale(1.33);
+  transform: scale(var(--hero-slide-crop-scale));
   transform-origin: center center;
+  z-index: 0;
 }
 
 .hero-slide-overlay {
@@ -225,6 +237,7 @@ html {
     rgba(14, 20, 44, 0.45) 45%,
     rgba(8, 12, 32, 0.72) 100%
   );
+  z-index: 1;
 }
 
 .hero-slide-content {
@@ -232,7 +245,7 @@ html {
   left: clamp(1rem, 2.5vw, 2rem);
   right: clamp(1rem, 2.5vw, 2rem);
   bottom: clamp(0.9rem, 2.2vw, 1.4rem);
-  z-index: 2;
+  z-index: 3;
   max-width: min(560px, calc(100% - 2rem));
   display: grid;
   gap: 0.45rem;
@@ -251,7 +264,7 @@ html {
 
 .hero-slide-title {
   margin: 0;
-  font-size: clamp(1.2rem, 3.1vw, 2rem);
+  font-size: clamp(1.55rem, 3.9vw, 2.6rem);
   line-height: 1.2;
   letter-spacing: 0.03em;
   text-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
@@ -268,10 +281,10 @@ html {
   width: fit-content;
   text-decoration: none;
   color: #ecf3ff;
-  font-weight: 600;
-  font-size: 0.86rem;
+  font-weight: 700;
+  font-size: clamp(1rem, 1.45vw, 1.18rem);
   border-radius: 999px;
-  padding: 0.42rem 0.85rem;
+  padding: 0.58rem 1.18rem;
   border: 1px solid rgba(255, 255, 255, 0.24);
   background: rgba(84, 140, 233, 0.24);
   transition: transform 0.18s ease, background 0.18s ease;
@@ -458,7 +471,7 @@ html {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   align-items: start;
-  width: min(320px, calc(100vw - (var(--page-padding-x) * 2)));
+  width: min(390px, calc(100vw - (var(--page-padding-x) * 2)));
   padding: 12px 14px;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -504,16 +517,17 @@ html {
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.36rem 0.66rem;
-  font-size: 0.8rem;
-  border-radius: 12px;
+  padding: 0.56rem 0.9rem;
+  font-size: 0.98rem;
+  font-weight: 700;
+  border-radius: 14px;
 }
 
 .floating-button.menu-trigger::after {
   content: "▾";
-  font-size: 0.68rem;
+  font-size: 0.8rem;
   opacity: 0.85;
-  margin-left: 0.3rem;
+  margin-left: 0.45rem;
 }
 
 .floating-menu {
@@ -1077,6 +1091,14 @@ html {
 
 /* ========== 響應式設計 ========== */
 @media (max-width: 768px) {
+  :root {
+    --hero-carousel-padding-top: clamp(2.2rem, 11vw, 3.2rem);
+    --hero-carousel-padding-bottom: clamp(1.6rem, 5vw, 2.2rem);
+    --hero-carousel-margin-top: 1.1rem;
+    --hero-carousel-height: 330px;
+    --hero-carousel-radius: 12px;
+  }
+
   .hero {
     padding: clamp(2rem, 10vw, 3rem) 0;
   }
@@ -1085,17 +1107,13 @@ html {
     height: auto;
     min-height: 0;
     max-height: none;
-    padding: clamp(2.2rem, 11vw, 3.2rem) 0 clamp(1.6rem, 5vw, 2.2rem) 0;
   }
 
   .hero-carousel-wrap {
-    margin-top: 1.1rem;
     padding: 0 var(--page-padding-x);
   }
 
   .hero-carousel-viewport {
-    height: 330px;
-    border-radius: 12px;
   }
 
   .hero-slide-content {
@@ -1107,11 +1125,16 @@ html {
   }
 
   .hero-slide-title {
-    font-size: 1.2rem;
+    font-size: 1.45rem;
   }
 
   .hero-slide-subtitle {
     font-size: 0.82rem;
+  }
+
+  .hero-slide-cta {
+    font-size: 1rem;
+    padding: 0.52rem 1.02rem;
   }
 
   .hero-nav {
@@ -1197,7 +1220,12 @@ html {
     gap: 8px;
     padding: 9px 10px;
     align-items: start;
-    width: min(290px, calc(100vw - (var(--page-padding-x) * 2)));
+    width: min(330px, calc(100vw - (var(--page-padding-x) * 2)));
+  }
+
+  .floating-button.menu-trigger {
+    padding: 0.5rem 0.82rem;
+    font-size: 0.92rem;
   }
 
   .auth-modal {

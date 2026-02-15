@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,32 +16,37 @@ import com.example.cinema.service.EmployeeTodoService;
 import com.example.cinema.service.MemberLoyaltyService;
 import com.example.cinema.service.MemberNotificationService;
 import com.example.cinema.service.MemberOrderService;
+import com.example.cinema.service.MovieService;
+import com.example.cinema.service.EmployeeAdminService;
 import com.example.cinema.service.OperationsDashboardService;
 
 @Controller
 @RequestMapping("/employee/admin")
 public class EmployeeAdminController {
 
-    private final JdbcTemplate jdbcTemplate;
+    private final EmployeeAdminService employeeAdminService;
     private final MemberNotificationService memberNotificationService;
     private final MemberOrderService memberOrderService;
     private final MemberLoyaltyService memberLoyaltyService;
     private final EmployeeTodoService employeeTodoService;
     private final OperationsDashboardService operationsDashboardService;
+    private final MovieService movieService;
 
     public EmployeeAdminController(
-            JdbcTemplate jdbcTemplate,
+            EmployeeAdminService employeeAdminService,
             MemberNotificationService memberNotificationService,
             MemberOrderService memberOrderService,
             MemberLoyaltyService memberLoyaltyService,
             EmployeeTodoService employeeTodoService,
-            OperationsDashboardService operationsDashboardService) {
-        this.jdbcTemplate = jdbcTemplate;
+            OperationsDashboardService operationsDashboardService,
+            MovieService movieService) {
+        this.employeeAdminService = employeeAdminService;
         this.memberNotificationService = memberNotificationService;
         this.memberOrderService = memberOrderService;
         this.memberLoyaltyService = memberLoyaltyService;
         this.employeeTodoService = employeeTodoService;
         this.operationsDashboardService = operationsDashboardService;
+        this.movieService = movieService;
     }
 
     @GetMapping("/audit")
@@ -58,42 +62,14 @@ public class EmployeeAdminController {
         int cancellationCount = 0;
 
         try {
-            recentFailures = jdbcTemplate.queryForList(
-                    "SELECT created_at, actor_type, actor_id, action, target_type, target_id, result, detail " +
-                            "FROM audit_logs " +
-                            "WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) AND result <> 'SUCCESS' " +
-                            "ORDER BY created_at DESC LIMIT 100",
-                    safeHours);
-            actionStats = jdbcTemplate.queryForList(
-                    "SELECT action, result, COUNT(*) AS cnt " +
-                            "FROM audit_logs " +
-                            "WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) " +
-                            "GROUP BY action, result " +
-                            "ORDER BY cnt DESC, action ASC",
-                    safeHours);
-            Integer total = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM audit_logs WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? HOUR)",
-                    Integer.class,
-                    safeHours);
-            Integer failed = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM audit_logs WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) AND result <> 'SUCCESS'",
-                    Integer.class,
-                    safeHours);
-            Integer payFailed = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM audit_logs " +
-                            "WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) AND action = 'ORDER_PAY' AND result <> 'SUCCESS'",
-                    Integer.class,
-                    safeHours);
-            Integer cancelled = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM member_orders " +
-                            "WHERE cancelled_at IS NOT NULL AND cancelled_at >= DATE_SUB(NOW(), INTERVAL ? HOUR)",
-                    Integer.class,
-                    safeHours);
-
-            totalEvents = total == null ? 0 : total.intValue();
-            failedEvents = failed == null ? 0 : failed.intValue();
-            paymentFailures = payFailed == null ? 0 : payFailed.intValue();
-            cancellationCount = cancelled == null ? 0 : cancelled.intValue();
+            EmployeeAdminService.AuditDashboardData data = employeeAdminService.loadAuditDashboard(safeHours);
+            safeHours = data.hours();
+            recentFailures = data.recentFailures();
+            actionStats = data.actionStats();
+            totalEvents = data.totalEvents();
+            failedEvents = data.failedEvents();
+            paymentFailures = data.paymentFailures();
+            cancellationCount = data.cancellationCount();
         } catch (DataAccessException ex) {
             model.addAttribute("error", "稽核資料表尚未就緒，請先完成資料庫 migration。");
         }
@@ -111,17 +87,11 @@ public class EmployeeAdminController {
 
     @GetMapping("/roles")
     public String roleManagement(Model model) {
-        List<Map<String, Object>> roles = jdbcTemplate.queryForList(
-                "SELECT id, code, name, level FROM roles ORDER BY level ASC");
-        List<Map<String, Object>> employees = jdbcTemplate.queryForList(
-                "SELECT e.id, e.nickname, r.code AS role_code, r.level AS role_level " +
-                        "FROM employee e " +
-                        "JOIN roles r ON r.id = e.role_id " +
-                        "ORDER BY r.level DESC, e.nickname ASC");
+        EmployeeAdminService.RoleManagementData data = employeeAdminService.loadRoleManagement();
 
         model.addAttribute("title", "管理員：角色管理");
-        model.addAttribute("roles", roles);
-        model.addAttribute("employees", employees);
+        model.addAttribute("roles", data.roles());
+        model.addAttribute("employees", data.employees());
         return "admin-roles";
     }
 
@@ -130,37 +100,20 @@ public class EmployeeAdminController {
             @RequestParam("nickname") String nickname,
             @RequestParam("roleCode") String roleCode,
             RedirectAttributes redirectAttributes) {
-
         String safeNickname = nickname == null ? "" : nickname.trim();
         String safeRole = roleCode == null ? "" : roleCode.trim().toUpperCase();
-        if (safeNickname.isBlank() || safeRole.isBlank()) {
-            redirectAttributes.addFlashAttribute("error", "請選擇要調整的帳號與角色。");
-            return "redirect:/employee/admin/roles";
-        }
-
-        int updated = jdbcTemplate.update(
-                "UPDATE employee " +
-                        "SET role_id = (SELECT id FROM roles WHERE code = ? LIMIT 1) " +
-                        "WHERE nickname = ?",
-                safeRole, safeNickname);
-
-        if (updated > 0) {
-            try {
-                jdbcTemplate.update(
-                        "INSERT INTO audit_logs (actor_type, actor_id, action, target_type, target_id, result, detail) " +
-                                "VALUES ('EMPLOYEE', 'admin', 'EMPLOYEE_ROLE_UPDATE', 'EMPLOYEE', ?, 'SUCCESS', ?)",
-                        safeNickname,
-                        "role=" + safeRole);
-            } catch (DataAccessException ignored) {
-                // Audit table might be unavailable in lightweight test schemas.
+        try {
+            boolean updated = employeeAdminService.updateEmployeeRole(safeNickname, safeRole);
+            if (updated) {
+                redirectAttributes.addFlashAttribute("success",
+                        "已更新 " + safeNickname + " 的角色為 " + safeRole + "。");
+            } else {
+                redirectAttributes.addFlashAttribute("error",
+                        "更新失敗：找不到員工帳號 " + safeNickname + "。");
             }
-            redirectAttributes.addFlashAttribute("success",
-                    "已更新 " + safeNickname + " 的角色為 " + safeRole + "。");
-        } else {
-            redirectAttributes.addFlashAttribute("error",
-                    "更新失敗：找不到員工帳號 " + safeNickname + "。");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("error", ex.getMessage());
         }
-
         return "redirect:/employee/admin/roles";
     }
 
@@ -168,7 +121,24 @@ public class EmployeeAdminController {
     public String tools(Model model) {
         model.addAttribute("title", "管理員：維護工具");
         model.addAttribute("snapshot", operationsDashboardService.cleanupSnapshot());
+        model.addAttribute("catalogItems", movieService.listCatalogItems());
         return "admin-tools";
+    }
+
+    @PostMapping("/tools/update-poster")
+    public String updateMoviePoster(
+            @RequestParam("movieId") String movieId,
+            @RequestParam("posterUrl") String posterUrl,
+            RedirectAttributes redirectAttributes) {
+        try {
+            movieService.updatePosterUrl(movieId, posterUrl, "admin-tools");
+            redirectAttributes.addFlashAttribute("success", "海報更新成功：" + movieId);
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("error", ex.getMessage());
+        } catch (Exception ex) {
+            redirectAttributes.addFlashAttribute("error", "海報更新失敗，請確認資料庫狀態後再試。");
+        }
+        return "redirect:/employee/admin/tools";
     }
 
     @PostMapping("/tools/expire-orders")

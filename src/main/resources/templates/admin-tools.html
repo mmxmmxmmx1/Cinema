@@ -60,6 +60,19 @@
             <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <button type="submit">重置今日待辦為預設值</button>
         </form>
+        <div style="height: 16px;"></div>
+        <form method="post" action="/employee/admin/tools/update-poster">
+            <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <label for="movieId">電影：</label>
+            <select id="movieId" name="movieId" required>
+                <option th:each="m : ${catalogItems}" th:value="${m.id()}" th:text="${m.id() + '｜' + m.title()}">mv-01｜沙丘:第二部</option>
+            </select>
+            <div style="height: 8px;"></div>
+            <label for="posterUrl">海報網址（https://... 或 /images/...）：</label>
+            <input id="posterUrl" name="posterUrl" type="text" style="width: min(100%, 680px);" required>
+            <div style="height: 10px;"></div>
+            <button type="submit">更新海報網址</button>
+        </form>
     </section>
 
     <section>

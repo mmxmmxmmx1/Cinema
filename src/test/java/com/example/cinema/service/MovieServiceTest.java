@@ -248,4 +248,32 @@ class MovieServiceTest {
                         "座位預訂狀態應該相同");
         }
     }
+
+    @Test
+    @DisplayName("更新海報網址時應回寫到目前有效電影資料")
+    void shouldUpdatePosterUrlInEffectiveCatalog() {
+        movieService.updatePosterUrl("mv-01", "https://example.com/new-poster.jpg", "test-admin");
+
+        Optional<Movie> movie = movieService.getMovieWithAvailability("mv-01");
+        assertTrue(movie.isPresent());
+        assertEquals("https://example.com/new-poster.jpg", movie.get().getPosterUrl());
+    }
+
+    @Test
+    @DisplayName("更新海報網址時應拒絕 http 連結")
+    void shouldRejectHttpPosterUrl() {
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> movieService.updatePosterUrl("mv-01", "http://example.com/unsafe.jpg", "test-admin"));
+        assertTrue(ex.getMessage().contains("https://") || ex.getMessage().contains("/images/"));
+    }
+
+    @Test
+    @DisplayName("更新海報網址時電影不存在應拋錯")
+    void shouldThrowWhenUpdatingPosterForUnknownMovie() {
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> movieService.updatePosterUrl("mv-999", "https://example.com/new-poster.jpg", "test-admin"));
+        assertTrue(ex.getMessage().contains("找不到電影"));
+    }
 }

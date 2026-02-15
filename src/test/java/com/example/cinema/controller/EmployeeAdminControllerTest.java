@@ -18,13 +18,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.example.cinema.service.EmployeeAdminService;
 import com.example.cinema.service.EmployeeTodoService;
 import com.example.cinema.service.MemberLoyaltyService;
 import com.example.cinema.service.MemberNotificationService;
 import com.example.cinema.service.MemberOrderService;
+import com.example.cinema.service.MovieService;
 import com.example.cinema.service.OperationsDashboardService;
 
 @WebMvcTest(EmployeeAdminController.class)
@@ -36,7 +37,7 @@ class EmployeeAdminControllerTest {
     private MockMvc mockMvc;
 
     @MockBean
-    private JdbcTemplate jdbcTemplate;
+    private EmployeeAdminService employeeAdminService;
 
     @MockBean
     private MemberNotificationService memberNotificationService;
@@ -53,11 +54,15 @@ class EmployeeAdminControllerTest {
     @MockBean
     private OperationsDashboardService operationsDashboardService;
 
+    @MockBean
+    private MovieService movieService;
+
     @Test
     @DisplayName("GET /employee/admin/tools 應顯示管理工具頁")
     void shouldRenderAdminToolsPage() throws Exception {
         when(operationsDashboardService.cleanupSnapshot())
                 .thenReturn(new OperationsDashboardService.CleanupSnapshot(2, 5));
+        when(movieService.listCatalogItems()).thenReturn(List.of());
 
         mockMvc.perform(get("/employee/admin/tools"))
                 .andExpect(status().isOk())
@@ -93,6 +98,20 @@ class EmployeeAdminControllerTest {
         doNothing().when(employeeTodoService).replaceTodayTodos(any(), any());
 
         mockMvc.perform(post("/employee/admin/tools/reset-todos").with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(view().name("redirect:/employee/admin/tools"))
+                .andExpect(flash().attributeExists("success"));
+    }
+
+    @Test
+    @DisplayName("POST /employee/admin/tools/update-poster 應更新海報並回傳成功訊息")
+    void shouldUpdatePosterUrl() throws Exception {
+        doNothing().when(movieService).updatePosterUrl("mv-01", "https://example.com/p1.jpg", "admin-tools");
+
+        mockMvc.perform(post("/employee/admin/tools/update-poster")
+                        .with(csrf())
+                        .param("movieId", "mv-01")
+                        .param("posterUrl", "https://example.com/p1.jpg"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(view().name("redirect:/employee/admin/tools"))
                 .andExpect(flash().attributeExists("success"));

@@ -48,9 +48,9 @@ const HomePage = {
       const byId = new Map(this.movies.map((movie) => [movie && movie.id, movie]));
       const preferredMovies = preferredOrder
         .map((id) => byId.get(id))
-        .filter((movie) => movie && movie.posterUrl);
+        .filter((movie) => movie && (movie.carouselImageUrl || movie.posterUrl));
       const fallbackMovies = this.movies.filter(
-        (movie) => movie && movie.posterUrl && !preferredOrder.includes(movie.id)
+        (movie) => movie && (movie.carouselImageUrl || movie.posterUrl) && !preferredOrder.includes(movie.id)
       );
       const selectedMovies = [...preferredMovies, ...fallbackMovies].slice(0, 5);
 
@@ -59,7 +59,9 @@ const HomePage = {
         movieId: movie && movie.id != null ? movie.id : null,
         title: movie && movie.title ? movie.title : '現正熱映',
         subtitle: movie && movie.subtitle ? movie.subtitle : '',
-        imageUrl: movie && movie.posterUrl ? movie.posterUrl : '/images/sleep.jpg'
+        imageUrl: movie && (movie.carouselImageUrl || movie.posterUrl)
+          ? (movie.carouselImageUrl || movie.posterUrl)
+          : '/images/sleep.jpg'
       }));
     }
   },
@@ -375,7 +377,8 @@ const CheckoutPage = {
       unitPrice: 300,
       totalPrice: 0,
       paymentMode: 'SUCCESS',
-      alreadyPaidOrder: null
+      alreadyPaidOrder: null,
+      lastApiErrorCode: null
     };
   },
   async mounted() {
@@ -418,12 +421,21 @@ const CheckoutPage = {
     },
     async readApiErrorMessage(response, fallbackMessage) {
       let message = fallbackMessage;
+      this.lastApiErrorCode = null;
       try {
         const contentType = (response.headers && response.headers.get('content-type')) || '';
         if (contentType.includes('application/json')) {
           const data = await response.json();
+          const code = data && typeof data.code === 'string' ? data.code.trim() : '';
+          if (code) {
+            this.lastApiErrorCode = code;
+          }
           const serverMessage = data && typeof data.message === 'string' ? data.message.trim() : '';
           const serverError = data && typeof data.error === 'string' ? data.error.trim() : '';
+          if (code && (!serverMessage || serverMessage === 'Forbidden')) {
+            const mapped = this.mapApiErrorByCode(code);
+            if (mapped) return mapped;
+          }
           if (serverMessage) return serverMessage;
           if (serverError) return serverError;
           return message;
@@ -434,6 +446,26 @@ const CheckoutPage = {
         }
       } catch (_) {}
       return message;
+    },
+    mapApiErrorByCode(code) {
+      const safe = typeof code === 'string' ? code.trim().toUpperCase() : '';
+      if (!safe) return '';
+      if (safe === 'CSRF_MISSING' || safe === 'CSRF_INVALID' || safe === 'CSRF_FAILED') {
+        return 'CSRF token 無效或已過期，請重新整理後再試。';
+      }
+      if (safe === 'MEMBER_ACCESS_DENIED') {
+        return '沒有會員權限，請確認已使用會員帳號登入。';
+      }
+      if (safe === 'TICKET_RULE_VIOLATION') {
+        return '不符合購票規則，請檢查座位、張數與場次限制。';
+      }
+      if (safe === 'TICKET_CONFLICT') {
+        return '座位已被其他人預訂，請重新選位。';
+      }
+      if (safe === 'RATE_LIMIT_EXCEEDED') {
+        return '操作過於頻繁，請稍後再試。';
+      }
+      return '';
     },
     isCsrfRelatedMessage(message) {
       const text = typeof message === 'string' ? message : '';
@@ -450,7 +482,8 @@ const CheckoutPage = {
         return `Forbidden：你目前是員工登入（${checkJson.username || ''}），請先員工登出後再用會員登入。`;
       }
       if (!message || message === defaultMessage || message === 'Forbidden' || this.isCsrfRelatedMessage(message)) {
-        return 'CSRF token 無效或已過期，請重新整理後再試。';
+        const byCode = this.mapApiErrorByCode(this.lastApiErrorCode);
+        return byCode || 'CSRF token 無效或已過期，請重新整理後再試。';
       }
       return message;
     },

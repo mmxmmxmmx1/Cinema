@@ -237,16 +237,21 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex.accessDeniedHandler((request, response, accessDeniedException) -> {
                     if (request.getRequestURI() != null && request.getRequestURI().startsWith("/member/api/")) {
                         String message;
+                        String code;
                         if (accessDeniedException instanceof MissingCsrfTokenException) {
                             message = "缺少 CSRF token，請重新整理頁面後再試。";
+                            code = "CSRF_MISSING";
                         } else if (accessDeniedException instanceof InvalidCsrfTokenException) {
                             message = "CSRF token 不一致或已過期，請重新整理頁面後再試。";
+                            code = "CSRF_INVALID";
                         } else if (accessDeniedException instanceof CsrfException) {
                             message = "CSRF 驗證失敗，請重新整理頁面後再試。";
+                            code = "CSRF_FAILED";
                         } else {
                             message = "沒有會員權限，請確認已使用會員帳號登入。";
+                            code = "MEMBER_ACCESS_DENIED";
                         }
-                        writeJsonError(response, HttpStatus.FORBIDDEN, message);
+                        writeJsonError(response, HttpStatus.FORBIDDEN, code, message);
                         return;
                     }
                     response.sendError(HttpStatus.FORBIDDEN.value(), "Forbidden");
@@ -390,11 +395,13 @@ public class SecurityConfig {
         return baseUrl + glue + "returnTo=" + URLEncoder.encode(safe, StandardCharsets.UTF_8);
     }
 
-    private static void writeJsonError(HttpServletResponse response, HttpStatus status, String message)
+    private static void writeJsonError(HttpServletResponse response, HttpStatus status, String code, String message)
             throws java.io.IOException {
         response.setStatus(status.value());
         response.setContentType("application/json;charset=UTF-8");
-        response.getWriter().write("{\"status\":" + status.value() + ",\"message\":\"" + jsonEscape(message) + "\"}");
+        response.getWriter().write("{\"status\":" + status.value()
+                + ",\"code\":\"" + jsonEscape(code) + "\""
+                + ",\"message\":\"" + jsonEscape(message) + "\"}");
     }
 
     private static String jsonEscape(String text) {

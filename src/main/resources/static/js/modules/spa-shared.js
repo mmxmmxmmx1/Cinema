@@ -361,6 +361,10 @@
           const contentType = (response.headers && response.headers.get('content-type')) || '';
           if (contentType.includes('application/json')) {
             const data = await response.json();
+            const code = data && typeof data.code === 'string' ? data.code.trim().toUpperCase() : '';
+            if (code === 'CSRF_MISSING' || code === 'CSRF_INVALID' || code === 'CSRF_FAILED') {
+              return 'CSRF token 無效或已過期，請重新整理後再試。';
+            }
             if (data && typeof data.message === 'string' && data.message.trim()) {
               return data.message.trim();
             }
@@ -631,7 +635,7 @@
           <img class="hero-badge" src="/images/sleep.jpg" alt="Very Sleepy Cinema 徽章">
           <div class="hero-text">
             <h1>很好睡電影院</h1>
-            <p style="color: #0044BB;">每個顧客都可以睡得很安穩</p>
+            <p class="hero-tagline">每個顧客都可以睡得很安穩</p>
           </div>
         </div>
 

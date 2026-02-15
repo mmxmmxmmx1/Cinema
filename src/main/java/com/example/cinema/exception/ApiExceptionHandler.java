@@ -26,22 +26,22 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(TicketPurchaseRuleViolationException.class)
     public ResponseEntity<ApiError> purchaseRule(TicketPurchaseRuleViolationException ex, HttpServletRequest request) {
-        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request, null);
+        return build(HttpStatus.BAD_REQUEST, "TICKET_RULE_VIOLATION", ex.getMessage(), request, null);
     }
 
     @ExceptionHandler(TicketPurchaseConflictException.class)
     public ResponseEntity<ApiError> purchaseConflict(TicketPurchaseConflictException ex, HttpServletRequest request) {
-        return build(HttpStatus.CONFLICT, ex.getMessage(), request, null);
+        return build(HttpStatus.CONFLICT, "TICKET_CONFLICT", ex.getMessage(), request, null);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiError> illegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
-        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request, null);
+        return build(HttpStatus.BAD_REQUEST, "ILLEGAL_ARGUMENT", ex.getMessage(), request, null);
     }
 
     @ExceptionHandler(RateLimitExceededException.class)
     public ResponseEntity<ApiError> rateLimit(RateLimitExceededException ex, HttpServletRequest request) {
-        return build(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request, null);
+        return build(HttpStatus.TOO_MANY_REQUESTS, "RATE_LIMIT_EXCEEDED", ex.getMessage(), request, null);
     }
 
     @ExceptionHandler(UserRegistrationException.class)
@@ -49,7 +49,7 @@ public class ApiExceptionHandler {
         HttpStatus status = ex.getMessage() != null && ex.getMessage().contains("已存在")
                 ? HttpStatus.CONFLICT
                 : HttpStatus.BAD_REQUEST;
-        return build(status, ex.getMessage(), request, null);
+        return build(status, "USER_REGISTRATION_FAILED", ex.getMessage(), request, null);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -60,20 +60,21 @@ public class ApiExceptionHandler {
             fields.put(err.getField(), err.getDefaultMessage());
         }
         details.put("fields", fields);
-        return build(HttpStatus.BAD_REQUEST, "Validation failed", request, details);
+        return build(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Validation failed", request, details);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> unknown(Exception ex, HttpServletRequest request) {
         // Don't leak stack traces/implementation details to clients.
-        return build(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error", request, null);
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Internal server error", request, null);
     }
 
-    private ResponseEntity<ApiError> build(HttpStatus status, String message, HttpServletRequest request,
+    private ResponseEntity<ApiError> build(HttpStatus status, String code, String message, HttpServletRequest request,
             Map<String, Object> details) {
         ApiError payload = new ApiError(
                 AppClock.nowInstant(),
                 status.value(),
+                code,
                 status.getReasonPhrase(),
                 message,
                 request == null ? null : request.getRequestURI(),
