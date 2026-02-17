@@ -26,7 +26,15 @@
 ## 4. PR/CI 檢查
 
 - PR 只允許「新增」 migration，不允許修改既有版本。
-- CI 由 `scripts/check-migration-immutability.sh` 執行檢查。
+- Push 與 PR 都會由 CI 執行 `scripts/check-migration-immutability.sh` 檢查。
+- 腳本參數可用「分支名稱」或「commit SHA」。
+
+本機可手動檢查（範例）：
+
+```bash
+./scripts/check-migration-immutability.sh origin/master
+./scripts/check-migration-immutability.sh HEAD~1
+```
 
 ## 5. 命名建議
 

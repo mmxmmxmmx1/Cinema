@@ -133,10 +133,9 @@ public class SecurityConfig {
                         .requestMatchers("/employee/**").hasAnyRole("EMPLOYEE", "IT", "MANAGER", "ADMIN")
                         .anyRequest().authenticated())
 
-                // Keep CSRF enabled for employee pages. Only ignore heartbeat endpoints.
+                // Keep CSRF enabled for employee pages.
+                // Only ignore non-sensitive heartbeat endpoints.
                 .csrf(csrf -> csrf.ignoringRequestMatchers(
-                        // Allow POST logout without requiring a CSRF token for demo ergonomics.
-                        "/employee/logout",
                         "/employee/activity",
                         "/employee/it/activity",
                         "/employee/manager/activity",
@@ -256,12 +255,11 @@ public class SecurityConfig {
                     }
                     response.sendError(HttpStatus.FORBIDDEN.value(), "Forbidden");
                 }))
-                // Keep CSRF enabled for member pages. Only ignore the heartbeat endpoint.
+                // Keep CSRF enabled for member pages.
+                // Only ignore non-sensitive heartbeat endpoint.
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository())
                         .ignoringRequestMatchers(
-                                // Allow POST logout without requiring a CSRF token for demo ergonomics.
-                                "/member/logout",
                                 "/member/activity"))
                 .headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp.policyDirectives(STANDARD_CSP))

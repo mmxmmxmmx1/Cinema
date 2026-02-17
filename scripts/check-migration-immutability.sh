@@ -3,12 +3,16 @@ set -euo pipefail
 
 BASE_REF="${1:-}"
 if [[ -z "${BASE_REF}" ]]; then
-  echo "Usage: $0 <base-ref>"
+  echo "Usage: $0 <base-ref-or-commit>"
   exit 2
 fi
 
-git fetch --no-tags --depth=1 origin "${BASE_REF}"
-BASE_COMMIT="origin/${BASE_REF}"
+if git rev-parse --verify -q "${BASE_REF}^{commit}" >/dev/null; then
+  BASE_COMMIT="${BASE_REF}"
+else
+  git fetch --no-tags --depth=1 origin "${BASE_REF}"
+  BASE_COMMIT="origin/${BASE_REF}"
+fi
 
 changed="$(git diff --name-status "${BASE_COMMIT}"...HEAD -- 'src/main/resources/db/migration/V*.sql' || true)"
 if [[ -z "${changed}" ]]; then

@@ -348,8 +348,11 @@ const CheckoutPage = {
               <div v-if="paySuccess" class="loading" style="margin-top: 14px;">{{ paySuccess }}</div>
 
               <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
-                <button v-if="!alreadyPaidOrder" type="button" :disabled="paying" @click="confirmPay">
+                <button v-if="!alreadyPaidOrder && !paySuccess" type="button" :disabled="paying" @click="confirmPay">
                   {{ paying ? '付款處理中…' : '確認付款' }}
+                </button>
+                <button v-if="paySuccess && alreadyPaidOrder" type="button" class="primary-link" disabled>
+                  已完成付款
                 </button>
                 <button type="button" class="primary-link" @click="goToOrders">我的訂單</button>
                 <button v-if="alreadyPaidOrder" type="button" class="primary-link" @click="goToOrderDetail">查看該筆訂單</button>
@@ -681,6 +684,15 @@ const CheckoutPage = {
           return;
         }
         this.paySuccess = `付款成功，訂單編號 #${paid.orderId}`;
+        this.alreadyPaidOrder = {
+          orderId: paid.orderId || orderId,
+          status: 'PAID',
+          movieId: String(this.$route.params.movieId),
+          showtimeId: String(this.$route.params.showtimeId),
+          seatIds: Array.isArray(this.seatIds) ? [...this.seatIds] : [],
+          unitPrice: this.unitPrice,
+          totalPrice: this.totalPrice
+        };
         sessionStorage.removeItem(idempotencyStorageKey);
         sessionStorage.removeItem('pendingCheckout');
       } catch (err) {

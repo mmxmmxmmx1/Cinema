@@ -38,3 +38,6 @@ build/
 *.tmp
 *.bak
 *.cache
+
+# Local environment file
+.env

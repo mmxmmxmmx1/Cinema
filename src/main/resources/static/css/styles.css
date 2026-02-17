@@ -28,6 +28,9 @@ html {
   --hero-carousel-radius: 16px;
   --hero-slide-crop-scale: 1.04;
   --hero-tagline-color: #0044bb;
+  --z-floating-panel: 1110;
+  --z-auth-widget: 1110;
+  --z-modal-backdrop: 1200;
 }
 
 /* ========== Hero 頂部區塊（背景延伸到底） ========== */
@@ -164,7 +167,7 @@ html {
   margin: 0;
 }
 
-.hero-tagline {
+.hero-text .hero-tagline {
   color: var(--hero-tagline-color);
 }
 
@@ -466,7 +469,7 @@ html {
   position: absolute;
   top: clamp(2.5rem, 6vw, 4rem);
   right: var(--page-padding-x);
-  z-index: 2147483000;
+  z-index: var(--z-floating-panel);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
@@ -597,7 +600,7 @@ html {
 .auth-modal-mask {
   position: fixed;
   inset: 0;
-  z-index: 2147483600;
+  z-index: var(--z-modal-backdrop);
   background: rgba(2, 6, 16, 0.7);
   display: flex;
   align-items: center;
@@ -718,7 +721,7 @@ html {
   right: 12px !important;
   left: auto !important;
   bottom: auto !important;
-  z-index: 2147483000;
+  z-index: var(--z-auth-widget);
   min-width: 230px;
   max-width: min(360px, calc(100vw - 2.5rem));
   padding: 0.85rem 0.95rem;
