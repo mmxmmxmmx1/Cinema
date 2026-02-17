@@ -44,7 +44,7 @@ const HomePage = {
       if (!Array.isArray(this.movies) || this.movies.length === 0) {
         return [];
       }
-      const preferredOrder = ['mv-01', 'mv-02', 'mv-03', 'mv-04', 'mv-05'];
+      const preferredOrder = ['mv-01', 'mv-02', 'mv-03', 'mv-04', 'mv-05', 'mv-06', 'mv-07', 'mv-08', 'mv-09', 'mv-10'];
       const byId = new Map(this.movies.map((movie) => [movie && movie.id, movie]));
       const preferredMovies = preferredOrder
         .map((id) => byId.get(id))
@@ -52,7 +52,7 @@ const HomePage = {
       const fallbackMovies = this.movies.filter(
         (movie) => movie && (movie.carouselImageUrl || movie.posterUrl) && !preferredOrder.includes(movie.id)
       );
-      const selectedMovies = [...preferredMovies, ...fallbackMovies].slice(0, 5);
+      const selectedMovies = [...preferredMovies, ...fallbackMovies].slice(0, 10);
 
       return selectedMovies.map((movie, index) => ({
         key: movie && movie.id != null ? `movie-${movie.id}` : `movie-fallback-${index}`,

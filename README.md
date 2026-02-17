@@ -26,6 +26,7 @@ Flyway Migration
 - 架構說明：`docs/architecture.md`
 - Demo 劇本：`docs/demo-script.md`
 - Flyway 規範：`docs/flyway-migration-rules.md`
+- 真實環境驗證清單：`docs/production-validation-checklist.md`
 
 ## 1. 環境需求
 
@@ -62,6 +63,10 @@ mvn spring-boot:run
 
 Flyway migration 位置：
 - `src/main/resources/db/migration`
+
+CSRF Cookie 安全設定（可透過環境變數調整）：
+- `APP_SECURITY_CSRF_COOKIE_SECURE`（prod 預設 `true`）
+- `APP_SECURITY_CSRF_COOKIE_SAME_SITE`（預設 `Lax`）
 
 ## Migration 規範（重要）
 

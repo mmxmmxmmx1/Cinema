@@ -32,4 +32,25 @@ if [[ -n "${violations}" ]]; then
   exit 1
 fi
 
+added_files="$(echo "${changed}" | awk '$1 == "A" { print $2 }')"
+if [[ -n "${added_files}" ]]; then
+  asset_violations=""
+  while IFS= read -r file; do
+    [[ -z "${file}" ]] && continue
+    if grep -Eiq 'poster_url|carousel_image_url' "${file}"; then
+      asset_violations+="${file}"$'\n'
+    fi
+  done <<< "${added_files}"
+
+  if [[ -n "${asset_violations}" ]]; then
+    echo
+    echo "ERROR: Detected image/content updates in versioned migrations."
+    echo "Use repeatable migration file for movie assets:"
+    echo "  src/main/resources/db/migration/R__movie_catalog_assets.sql"
+    echo "Please move poster_url/carousel_image_url updates out of V*.sql files."
+    echo "${asset_violations}"
+    exit 1
+  fi
+fi
+
 echo "Migration immutability check passed (only new V*.sql files were added)."

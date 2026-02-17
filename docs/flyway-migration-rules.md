@@ -14,6 +14,13 @@
 - 資料修正：`UPDATE ... WHERE ...`
 - 補 seed：`INSERT ... ON DUPLICATE KEY UPDATE ...`
 
+### 2.1 內容型資料（海報/輪播）規則
+
+- `movie_catalog` 的 `poster_url`、`carousel_image_url` 屬於「內容型資料」。
+- 不要再新增 `V*.sql` 只為了改圖片網址。
+- 請統一改 `src/main/resources/db/migration/R__movie_catalog_assets.sql`（repeatable migration）。
+- CI 會拒絕在新 `V*.sql` 中直接修改 `poster_url` / `carousel_image_url`。
+
 ## 3. 發生 checksum mismatch 時
 
 優先順序：

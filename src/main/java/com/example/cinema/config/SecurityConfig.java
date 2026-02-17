@@ -7,6 +7,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.Authentication;
@@ -71,15 +72,21 @@ public class SecurityConfig {
     private final SessionService sessionService;
     private final LoginAttemptService loginAttemptService;
     private final ObjectProvider<UserService> userServiceProvider;
+    private final boolean csrfCookieSecure;
+    private final String csrfCookieSameSite;
 
     public SecurityConfig(UserDao userDao,
             SessionService sessionService,
             LoginAttemptService loginAttemptService,
-            ObjectProvider<UserService> userServiceProvider) {
+            ObjectProvider<UserService> userServiceProvider,
+            @Value("${app.security.csrf-cookie-secure:false}") boolean csrfCookieSecure,
+            @Value("${app.security.csrf-cookie-same-site:Lax}") String csrfCookieSameSite) {
         this.userDao = userDao;
         this.sessionService = sessionService;
         this.loginAttemptService = loginAttemptService;
         this.userServiceProvider = userServiceProvider;
+        this.csrfCookieSecure = csrfCookieSecure;
+        this.csrfCookieSameSite = csrfCookieSameSite;
     }
 
     @Bean
@@ -94,7 +101,24 @@ public class SecurityConfig {
         repo.setCookiePath("/");
         repo.setCookieName("XSRF-TOKEN");
         repo.setHeaderName("X-XSRF-TOKEN");
+        repo.setCookieCustomizer(builder -> builder
+                .secure(csrfCookieSecure)
+                .sameSite(normalizeSameSite(csrfCookieSameSite)));
         return repo;
+    }
+
+    private static String normalizeSameSite(String raw) {
+        if (raw == null) {
+            return "Lax";
+        }
+        String value = raw.trim();
+        if (value.equalsIgnoreCase("Strict")) {
+            return "Strict";
+        }
+        if (value.equalsIgnoreCase("None")) {
+            return "None";
+        }
+        return "Lax";
     }
 
     @Bean
