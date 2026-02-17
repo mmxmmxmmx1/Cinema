@@ -159,11 +159,13 @@ public class SecurityConfig {
 
                 // Keep CSRF enabled for employee pages.
                 // Only ignore non-sensitive heartbeat endpoints.
-                .csrf(csrf -> csrf.ignoringRequestMatchers(
-                        "/employee/activity",
-                        "/employee/it/activity",
-                        "/employee/manager/activity",
-                        "/employee/admin/activity"))
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(csrfTokenRepository())
+                        .ignoringRequestMatchers(
+                                "/employee/activity",
+                                "/employee/it/activity",
+                                "/employee/manager/activity",
+                                "/employee/admin/activity"))
                 .headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp.policyDirectives(STANDARD_CSP))
                         .httpStrictTransportSecurity(hsts -> hsts

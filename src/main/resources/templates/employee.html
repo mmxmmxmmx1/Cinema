@@ -19,6 +19,45 @@
         th { color: #9ad0ff; font-weight: 600; background: rgba(154, 208, 255, 0.05); }
         a { color: #8ec7ff; text-decoration: none; }
         a:hover { text-decoration: underline; }
+        .btn-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #4d5f8f;
+            color: #fff;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .btn-link:hover {
+            background: #5d73ab;
+            text-decoration: none;
+        }
+        .bottom-actions {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .bottom-actions button,
+        .bottom-actions .btn-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 1;
+            margin-top: 0;
+            box-sizing: border-box;
+        }
         .status-open { color: #63e6be; font-weight: 500; }
         .status-low { color: #ffd166; font-weight: 500; }
         .status-critical { color: #ff6b6b; font-weight: 500; }
@@ -87,18 +126,18 @@
     
     <section>
         <h2>快速操作</h2>
-        <ul>
-            <li><a href="/employee/checklist">更新影廳檢查表</a></li>
-            <li><a href="/employee/maintenance">提交維修申請</a></li>
-        </ul>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px;">
+            <a class="btn-link" href="/employee/checklist">更新影廳檢查表</a>
+            <a class="btn-link" href="/employee/maintenance">提交維修申請</a>
+        </div>
     </section>
     
-    <div style="display: flex; gap: 15px; align-items: center; margin-top: 20px;">
+    <div class="bottom-actions">
         <form method="post" action="/employee/logout" style="margin: 0;">
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <button type="submit">登出員工帳號</button>
         </form>
-        <a href="/">返回首頁</a>
+        <a class="btn-link" href="/">返回首頁</a>
     </div>
     
     <form id="employee-auto-logout" method="post" action="/employee/logout" style="display: none;">

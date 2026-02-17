@@ -24,6 +24,11 @@
         a { color: #8ec7ff; text-decoration: none; }
         a:hover { text-decoration: underline; }
         .actions { display: flex; align-items: center; gap: 14px; margin-top: 12px; flex-wrap: wrap; }
+        .actions a.btn,
+        .actions a.btn:hover {
+            color: #fff;
+            text-decoration: none;
+        }
         .btn-secondary { background: #4d5f8f; }
         .btn-secondary:hover { background: #5d73ab; }
     </style>
@@ -113,8 +118,8 @@
                 <button type="button" class="btn btn-secondary" id="check-all-btn">全部勾選</button>
                 <button type="button" class="btn btn-secondary" id="uncheck-all-btn">全部取消</button>
                 <button type="submit" class="btn">儲存檢查表</button>
-                <a href="/employee">返回員工首頁</a>
-                <a href="/">回到網站首頁</a>
+                <a class="btn btn-secondary" href="/employee">返回員工首頁</a>
+                <a class="btn btn-secondary" href="/">回到網站首頁</a>
             </div>
         </form>
     </section>
