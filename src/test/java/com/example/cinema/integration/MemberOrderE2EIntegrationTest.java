@@ -421,6 +421,42 @@ class MemberOrderE2EIntegrationTest {
     }
 
     @Test
+    @DisplayName("10 名會員併發搶同一座位時仍不得超賣")
+    void shouldPreventOversellUnderTenConcurrentMembers() throws Exception {
+        String seat = pickAvailableSeats(1).get(0);
+        int contenders = 10;
+        CountDownLatch startLatch = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(contenders);
+        try {
+            @SuppressWarnings("unchecked")
+            Future<String>[] futures = new Future[contenders];
+            for (int i = 0; i < contenders; i++) {
+                String member = "load" + i;
+                jdbcTemplate.update(
+                        "INSERT INTO members (nickname, password) VALUES (?, ?)",
+                        member,
+                        "{noop}test123");
+                OrderDetailResponse order = memberOrderService.createOrder(member, MOVIE_ID, SHOWTIME_ID, List.of(seat));
+                futures[i] = executor.submit(payConcurrently(member, order.orderId(), startLatch));
+            }
+
+            startLatch.countDown();
+            int paidCount = 0;
+            for (Future<String> future : futures) {
+                String result = future.get(15, TimeUnit.SECONDS);
+                if ("PAID".equals(result)) {
+                    paidCount++;
+                }
+            }
+
+            assertEquals(1, paidCount);
+            assertEquals(1, countTicketsByShowtimeSeat(SHOWTIME_ID, seat));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
     @DisplayName("舊資料時間異常（00:00）時，訂單頁/會員頁仍應顯示一致的場次時間")
     void shouldKeepShowtimeDateTimeConsistentAcrossViews() {
         List<String> seats = pickAvailableSeats(1);

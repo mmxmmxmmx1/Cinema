@@ -4,10 +4,13 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -73,5 +76,50 @@ class SecurityAccessIntegrationTest {
                         .with(user("test123").roles("MEMBER"))
                         .with(csrf()))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("會員登出：有 CSRF 時應成功導向會員登入頁")
+    void shouldLogoutMemberWithCsrf() throws Exception {
+                mockMvc.perform(post("/member/logout")
+                        .with(user("test123").roles("MEMBER"))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/member/login"));
+    }
+
+    @Test
+    @DisplayName("會員登出：缺少 CSRF 時應回 403")
+    void shouldRejectMemberLogoutWithoutCsrf() throws Exception {
+        mockMvc.perform(post("/member/logout")
+                        .with(user("test123").roles("MEMBER")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("員工登出：有 CSRF 時應成功導向員工登入頁")
+    void shouldLogoutEmployeeWithCsrf() throws Exception {
+                mockMvc.perform(post("/employee/logout")
+                        .with(user("emp01").roles("EMPLOYEE"))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/employee/login"));
+    }
+
+    @Test
+    @DisplayName("員工登出：缺少 CSRF 時應回 403")
+    void shouldRejectEmployeeLogoutWithoutCsrf() throws Exception {
+        mockMvc.perform(post("/employee/logout")
+                        .with(user("emp01").roles("EMPLOYEE")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("HTTPS 請求應帶有 HSTS 安全標頭")
+    void shouldReturnHstsHeaderForSecureRequest() throws Exception {
+        mockMvc.perform(get("/").secure(true))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Strict-Transport-Security", Matchers.containsString("max-age=31536000")))
+                .andExpect(header().string("Strict-Transport-Security", Matchers.containsString("includeSubDomains")));
     }
 }

@@ -166,6 +166,10 @@ public class SecurityConfig {
                         "/employee/admin/activity"))
                 .headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp.policyDirectives(STANDARD_CSP))
+                        .httpStrictTransportSecurity(hsts -> hsts
+                                .includeSubDomains(true)
+                                .preload(true)
+                                .maxAgeInSeconds(31536000))
                         .frameOptions(frame -> frame.sameOrigin())
                         .referrerPolicy(ref -> ref.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
                         .permissionsPolicy(policy -> policy.policy("camera=(), microphone=(), geolocation=()")))
@@ -287,6 +291,10 @@ public class SecurityConfig {
                                 "/member/activity"))
                 .headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp.policyDirectives(STANDARD_CSP))
+                        .httpStrictTransportSecurity(hsts -> hsts
+                                .includeSubDomains(true)
+                                .preload(true)
+                                .maxAgeInSeconds(31536000))
                         .frameOptions(frame -> frame.sameOrigin())
                         .referrerPolicy(ref -> ref.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
                         .permissionsPolicy(policy -> policy.policy("camera=(), microphone=(), geolocation=()")))
@@ -371,6 +379,10 @@ public class SecurityConfig {
 
         http.headers(headers -> headers
                 .contentSecurityPolicy(csp -> csp.policyDirectives(SPA_CSP))
+                .httpStrictTransportSecurity(hsts -> hsts
+                        .includeSubDomains(true)
+                        .preload(true)
+                        .maxAgeInSeconds(31536000))
                 .frameOptions(frame -> frame.sameOrigin())
                 .referrerPolicy(ref -> ref.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
                 .permissionsPolicy(policy -> policy.policy("camera=(), microphone=(), geolocation=()")));

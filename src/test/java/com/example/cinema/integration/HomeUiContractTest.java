@@ -38,6 +38,14 @@ class HomeUiContractTest {
         assertTrue(css.contains(".hero-tagline"));
     }
 
+    @Test
+    @DisplayName("首頁輪播應支援10部電影而非只顯示5部")
+    void shouldSupportTenMoviesInCarousel() throws IOException {
+        String appJs = read("src/main/resources/static/js/app.js");
+        assertTrue(appJs.contains("const preferredOrder = ['mv-01', 'mv-02', 'mv-03', 'mv-04', 'mv-05', 'mv-06', 'mv-07', 'mv-08', 'mv-09', 'mv-10'];"));
+        assertTrue(appJs.contains(".slice(0, 10);"));
+    }
+
     private static String read(String relativePath) throws IOException {
         return Files.readString(Path.of(relativePath), StandardCharsets.UTF_8);
     }

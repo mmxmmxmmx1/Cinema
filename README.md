@@ -27,6 +27,13 @@ Flyway Migration
 - Demo 劇本：`docs/demo-script.md`
 - Flyway 規範：`docs/flyway-migration-rules.md`
 - 真實環境驗證清單：`docs/production-validation-checklist.md`
+- 部署與回滾 Runbook：`docs/deploy-rollback-runbook.md`
+- 瀏覽器流程自動化：`docs/browser-e2e-automation.md`
+- 壓力與併發測試計畫：`docs/load-concurrency-plan.md`
+- 監控與告警：`docs/monitoring-and-alerting.md`
+- 資料治理：`docs/data-governance.md`
+- 圖片素材規範：`docs/image-assets-policy.md`
+- 專案交接清單：`docs/handover-checklist.md`
 
 ## 1. 環境需求
 

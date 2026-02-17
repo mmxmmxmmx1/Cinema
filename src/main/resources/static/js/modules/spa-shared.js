@@ -453,15 +453,27 @@
         this.closeMenus();
         this.actionError = null;
         try {
-          await this.ensureCsrfCookie();
-          const xsrf = this.getCookie('XSRF-TOKEN');
-          const res = await fetch('/member/logout', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}) }
-          });
+          let xsrf = await this.ensureCsrfCookie();
+          if (!xsrf) xsrf = this.getCookie('XSRF-TOKEN');
+          const doLogout = async (token) => {
+            return fetch('/member/logout', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { ...(token ? { 'X-XSRF-TOKEN': token } : {}) }
+            });
+          };
+          let res = await doLogout(xsrf);
+          if (res.status === 403) {
+            xsrf = await this.ensureCsrfCookie();
+            if (!xsrf) xsrf = this.getCookie('XSRF-TOKEN');
+            res = await doLogout(xsrf);
+          }
           if (!res.ok && res.status !== 302) {
-            this.actionError = `登出失敗（${res.status}）`;
+            let message = await this.readApiErrorMessage(res, `登出失敗（${res.status}）`);
+            if (res.status === 403) {
+              message = '會員登出失敗：CSRF token 無效或已過期，請重新整理後再試。';
+            }
+            this.actionError = message;
             return;
           }
         } catch (_) {
@@ -475,15 +487,27 @@
         this.closeMenus();
         this.actionError = null;
         try {
-          await this.ensureCsrfCookie();
-          const xsrf = this.getCookie('XSRF-TOKEN');
-          const res = await fetch('/employee/logout', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}) }
-          });
+          let xsrf = await this.ensureCsrfCookie();
+          if (!xsrf) xsrf = this.getCookie('XSRF-TOKEN');
+          const doLogout = async (token) => {
+            return fetch('/employee/logout', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { ...(token ? { 'X-XSRF-TOKEN': token } : {}) }
+            });
+          };
+          let res = await doLogout(xsrf);
+          if (res.status === 403) {
+            xsrf = await this.ensureCsrfCookie();
+            if (!xsrf) xsrf = this.getCookie('XSRF-TOKEN');
+            res = await doLogout(xsrf);
+          }
           if (!res.ok && res.status !== 302) {
-            this.actionError = `員工登出失敗（${res.status}）`;
+            let message = await this.readApiErrorMessage(res, `員工登出失敗（${res.status}）`);
+            if (res.status === 403) {
+              message = '員工登出失敗：CSRF token 無效或已過期，請重新整理後再試。';
+            }
+            this.actionError = message;
             return;
           }
         } catch (_) {
