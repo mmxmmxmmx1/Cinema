@@ -4,8 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalTime;
@@ -13,6 +15,12 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -253,6 +261,21 @@ class MemberOrderE2EIntegrationTest {
     }
 
     @Test
+    @DisplayName("付款失敗後可在逾時前重新付款成功")
+    void shouldAllowRetryPaymentAfterFailure() {
+        List<String> seats = pickAvailableSeats(1);
+        OrderDetailResponse created = memberOrderService.createOrder(MEMBER, MOVIE_ID, SHOWTIME_ID, seats);
+
+        OrderDetailResponse failed = memberOrderService.payOrder(MEMBER, created.orderId(), "FAILED");
+        assertEquals("FAILED", failed.status());
+        assertEquals(0, countTicketsByOrder(created.orderId()));
+
+        OrderDetailResponse paid = memberOrderService.payOrder(MEMBER, created.orderId(), "SUCCESS");
+        assertEquals("PAID", paid.status());
+        assertEquals(1, countTicketsByOrder(created.orderId()));
+    }
+
+    @Test
     @DisplayName("取消已付款訂單時應回滾紅利點數")
     void shouldRollbackPointsAfterPaidOrderCancelled() {
         List<String> seats = pickAvailableSeats(2);
@@ -324,6 +347,27 @@ class MemberOrderE2EIntegrationTest {
     }
 
     @Test
+    @DisplayName("逾時未付款訂單應自動失效並釋放座位")
+    void shouldExpirePendingOrderAndReleaseSeats() throws Exception {
+        List<String> seats = pickAvailableSeats(1);
+        OrderDetailResponse created = memberOrderService.createOrder(MEMBER, MOVIE_ID, SHOWTIME_ID, seats);
+        jdbcTemplate.update(
+                "UPDATE member_orders SET created_at = ? WHERE id = ?",
+                Timestamp.from(ZonedDateTime.of(2026, 2, 12, 7, 10, 0, 0, ZONE).toInstant()),
+                created.orderId());
+
+        setTestClock(ZonedDateTime.of(2026, 2, 12, 7, 30, 0, 0, ZONE).toInstant());
+        memberOrderService.expireTimedOutPendingOrders();
+
+        OrderDetailResponse expired = memberOrderService.getOrder(MEMBER, created.orderId());
+        assertEquals("EXPIRED", expired.status());
+        assertEquals(0, countTicketsByOrder(created.orderId()));
+
+        OrderDetailResponse retry = memberOrderService.createOrder(MEMBER, MOVIE_ID, SHOWTIME_ID, seats);
+        assertEquals("PENDING", retry.status());
+    }
+
+    @Test
     @DisplayName("原場次結束後，應可改買其他影廳的後續場次")
     void shouldAllowCrossAuditoriumPurchaseAfterCurrentShowEnded() throws Exception {
         List<String> firstShowSeats = pickAvailableSeats(SHOWTIME_ID, 4);
@@ -342,6 +386,38 @@ class MemberOrderE2EIntegrationTest {
         OrderDetailResponse secondOrder = memberOrderService.createOrder(
                 MEMBER, MOVIE_ID, LATER_OTHER_AUDITORIUM_SHOWTIME_ID, otherAuditoriumSeats);
         assertEquals("PENDING", secondOrder.status());
+    }
+
+    @Test
+    @DisplayName("同座位並發付款時只能成功一筆")
+    void shouldAllowOnlyOneSuccessfulPaymentUnderConcurrentSeatRace() throws Exception {
+        String rival = "rival001";
+        jdbcTemplate.update(
+                "INSERT INTO members (nickname, password) VALUES (?, ?)",
+                rival,
+                "{noop}test123");
+
+        String seat = pickAvailableSeats(1).get(0);
+        OrderDetailResponse firstOrder = memberOrderService.createOrder(MEMBER, MOVIE_ID, SHOWTIME_ID, List.of(seat));
+        OrderDetailResponse secondOrder = memberOrderService.createOrder(rival, MOVIE_ID, SHOWTIME_ID, List.of(seat));
+
+        CountDownLatch startLatch = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<String> firstFuture = executor.submit(payConcurrently(MEMBER, firstOrder.orderId(), startLatch));
+            Future<String> secondFuture = executor.submit(payConcurrently(rival, secondOrder.orderId(), startLatch));
+            startLatch.countDown();
+
+            String firstResult = firstFuture.get(10, TimeUnit.SECONDS);
+            String secondResult = secondFuture.get(10, TimeUnit.SECONDS);
+            int paidCount = ("PAID".equals(firstResult) ? 1 : 0) + ("PAID".equals(secondResult) ? 1 : 0);
+
+            assertEquals(1, paidCount);
+            assertEquals(1, countTicketsByShowtimeSeat(SHOWTIME_ID, seat));
+            assertTrue(firstResult.equals("PAID") || secondResult.equals("PAID"));
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test
@@ -415,6 +491,26 @@ class MemberOrderE2EIntegrationTest {
                 Integer.class,
                 nickname);
         return points == null ? 0 : points.intValue();
+    }
+
+    private int countTicketsByShowtimeSeat(String showtimeId, String seatId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM member_tickets WHERE showtime_id = ? AND seat_id = ?",
+                Integer.class,
+                showtimeId,
+                seatId);
+        return count == null ? 0 : count.intValue();
+    }
+
+    private Callable<String> payConcurrently(String member, long orderId, CountDownLatch startLatch) {
+        return () -> {
+            startLatch.await(5, TimeUnit.SECONDS);
+            try {
+                return memberOrderService.payOrder(member, orderId, "SUCCESS").status();
+            } catch (TicketPurchaseConflictException | TicketPurchaseRuleViolationException ex) {
+                return "REJECTED";
+            }
+        };
     }
 
     private static void setTestClock(Instant instant) throws Exception {

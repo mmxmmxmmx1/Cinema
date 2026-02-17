@@ -11,6 +11,8 @@ import com.example.cinema.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -202,5 +204,36 @@ class MemberApiControllerTest {
                 .content("{\"nickname\":\"測試_123\",\"password\":\"test123\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.details.fields.nickname").value("nickname 只能使用英文與數字"));
+    }
+
+    @ParameterizedTest(name = "非法暱稱案例: {0}")
+    @ValueSource(strings = {
+            "測試123",
+            "user_name",
+            "user-name",
+            "user name",
+            "user😀",
+            "ａｂｃ１２３",
+            "';drop table members;--"
+    })
+    @DisplayName("會員註冊應拒絕非英數暱稱（多案例）")
+    @WithMockUser
+    void shouldRejectInvalidNicknamesInMultipleCases(String nickname) throws Exception {
+        mockMvc.perform(post("/api/auth/member/register")
+                .with(csrf())
+                .contentType("application/json")
+                .content("{\"nickname\":\"" + nickname + "\",\"password\":\"test123\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.fields.nickname").value("nickname 只能使用英文與數字"));
+    }
+
+    @Test
+    @DisplayName("會員註冊缺少 CSRF token 時應回傳 403")
+    @WithMockUser
+    void shouldReturn403WhenRegisterWithoutCsrf() throws Exception {
+        mockMvc.perform(post("/api/auth/member/register")
+                .contentType("application/json")
+                .content("{\"nickname\":\"newmember2\",\"password\":\"test123\"}"))
+                .andExpect(status().isForbidden());
     }
 }
