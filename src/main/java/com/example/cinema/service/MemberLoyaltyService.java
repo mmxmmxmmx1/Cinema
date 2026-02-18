@@ -2,9 +2,11 @@ package com.example.cinema.service;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -30,11 +32,16 @@ public class MemberLoyaltyService {
 
     private final JdbcTemplate jdbcTemplate;
     private final UserDao userDao;
+    private final int pointLogRetentionDays;
     private volatile Boolean pointLedgerEnabled;
 
-    public MemberLoyaltyService(JdbcTemplate jdbcTemplate, UserDao userDao) {
+    public MemberLoyaltyService(
+            JdbcTemplate jdbcTemplate,
+            UserDao userDao,
+            @Value("${app.point-log.retention-days:30}") int pointLogRetentionDays) {
         this.jdbcTemplate = jdbcTemplate;
         this.userDao = userDao;
+        this.pointLogRetentionDays = Math.max(1, pointLogRetentionDays);
     }
 
     public int currentPoints(String memberUsername) {
@@ -58,20 +65,26 @@ public class MemberLoyaltyService {
     public List<MemberPointLog> recentPointLogs(String memberUsername, int limit) {
         User member = loadMember(memberUsername);
         int safeLimit = Math.max(1, Math.min(50, limit));
+        Timestamp cutoff = Timestamp.from(pointLogCutoff());
         List<Map<String, Object>> rows = List.of();
         if (isPointLedgerEnabled()) {
             rows = jdbcTemplate.queryForList(
                     "SELECT COALESCE(ref_order_id, ref_redemption_id, 0) AS ref_id, amount, points_delta AS points, happened_at, description " +
                             "FROM member_point_ledger " +
-                            "WHERE member_id = ? " +
+                            "WHERE member_id = ? AND happened_at >= ? " +
                             "ORDER BY happened_at DESC, id DESC LIMIT ?",
                     member.getId(),
+                    cutoff,
                     safeLimit);
         }
         if (rows.isEmpty()) {
-            rows = legacyPointLogs(member.getId(), safeLimit);
+            rows = legacyPointLogs(member.getId(), cutoff, safeLimit);
         }
         return rows.stream().map(this::mapPointLog).toList();
+    }
+
+    public int pointLogRetentionDays() {
+        return pointLogRetentionDays;
     }
 
     public List<RewardOption> listRewardOptions() {
@@ -252,21 +265,27 @@ public class MemberLoyaltyService {
         return Math.max(0, earnedPoints - spentPoints);
     }
 
-    private List<Map<String, Object>> legacyPointLogs(long memberId, int safeLimit) {
+    private List<Map<String, Object>> legacyPointLogs(long memberId, Timestamp cutoff, int safeLimit) {
         return jdbcTemplate.queryForList(
                 "SELECT ref_id, amount, points, happened_at, description FROM (" +
                         " SELECT mo.id AS ref_id, mo.total_price AS amount, FLOOR(mo.total_price / 10) AS points, " +
                         "        mo.paid_at AS happened_at, CONCAT('訂單 #', mo.id, ' 付款回饋') AS description " +
                         " FROM member_orders mo " +
-                        " WHERE mo.member_id = ? AND mo.status = 'PAID' AND mo.paid_at IS NOT NULL " +
+                        " WHERE mo.member_id = ? AND mo.status = 'PAID' AND mo.paid_at IS NOT NULL AND mo.paid_at >= ? " +
                         " UNION ALL " +
                         " SELECT pr.id AS ref_id, 0 AS amount, (0 - pr.points_spent) AS points, " +
                         "        pr.created_at AS happened_at, CONCAT('點數兌換：', pr.reward_name) AS description " +
-                        " FROM member_point_redemptions pr WHERE pr.member_id = ? " +
+                        " FROM member_point_redemptions pr WHERE pr.member_id = ? AND pr.created_at >= ? " +
                         ") logs ORDER BY happened_at DESC LIMIT ?",
                 memberId,
+                cutoff,
                 memberId,
+                cutoff,
                 safeLimit);
+    }
+
+    private Instant pointLogCutoff() {
+        return AppClock.nowInstant().minus(pointLogRetentionDays, ChronoUnit.DAYS);
     }
 
     private void applyRedeemLedger(long memberId, long redemptionId, RewardOption reward) {

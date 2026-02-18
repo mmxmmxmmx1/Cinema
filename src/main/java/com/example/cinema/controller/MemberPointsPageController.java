@@ -32,6 +32,7 @@ public class MemberPointsPageController {
     @GetMapping("/member/points")
     public String points(Authentication authentication, Model model) {
         String username = authentication == null ? null : authentication.getName();
+        model.addAttribute("pointLogRetentionDays", memberLoyaltyService.pointLogRetentionDays());
         try {
             int points = memberLoyaltyService.currentPoints(username);
             List<MemberPointLog> logs = memberLoyaltyService.recentPointLogs(username, 20);

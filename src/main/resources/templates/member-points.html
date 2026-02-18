@@ -39,6 +39,10 @@
 
     <section class="member-card">
         <h2>最近回饋</h2>
+        <p class="member-meta"
+           th:text="${'回饋訊息只保留 ' + (pointLogRetentionDays != null ? pointLogRetentionDays : 30) + ' 天，逾期自動清除。'}">
+            回饋訊息只保留 30 天，逾期自動清除。
+        </p>
         <div class="member-meta" th:if="${logs == null || #lists.isEmpty(logs)}">目前沒有點數紀錄</div>
         <ul th:if="${logs != null && !#lists.isEmpty(logs)}">
             <li th:each="log : ${logs}">
