@@ -13,7 +13,7 @@ import com.example.cinema.filter.TraceIdFilter;
 import com.example.cinema.service.SystemHealthService;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping({ "/api", "/api/v1" })
 public class SystemHealthController {
 
     private final SystemHealthService systemHealthService;

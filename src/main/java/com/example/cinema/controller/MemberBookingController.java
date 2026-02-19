@@ -17,7 +17,7 @@ import com.example.cinema.service.TicketPurchaseService;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/member/api")
+@RequestMapping({ "/member/api", "/member/api/v1" })
 @Validated
 public class MemberBookingController {
 

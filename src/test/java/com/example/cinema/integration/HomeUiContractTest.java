@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,8 +43,41 @@ class HomeUiContractTest {
     @DisplayName("首頁輪播應支援10部電影而非只顯示5部")
     void shouldSupportTenMoviesInCarousel() throws IOException {
         String appJs = read("src/main/resources/static/js/app.js");
-        assertTrue(appJs.contains("const preferredOrder = ['mv-01', 'mv-02', 'mv-03', 'mv-04', 'mv-05', 'mv-06', 'mv-07', 'mv-08', 'mv-09', 'mv-10'];"));
-        assertTrue(appJs.contains(".slice(0, 10);"));
+        String appPagesJs = read("src/main/resources/static/js/modules/app-pages.js");
+        String combined = appJs + "\n" + appPagesJs;
+        assertTrue(combined.contains(
+                "const preferredOrder = ['mv-01', 'mv-02', 'mv-03', 'mv-04', 'mv-05', 'mv-06', 'mv-07', 'mv-08', 'mv-09', 'mv-10'];"));
+        assertTrue(combined.contains(".slice(0, 10);"));
+    }
+
+    @Test
+    @DisplayName("登入與員工頁面應避免行內 script/event handler")
+    void shouldAvoidInlineScriptsAndInlineHandlers() throws IOException {
+        List<String> templates = List.of(
+                "src/main/resources/templates/member-login.html",
+                "src/main/resources/templates/employee-login.html",
+                "src/main/resources/templates/member.html",
+                "src/main/resources/templates/employee.html",
+                "src/main/resources/templates/admin.html",
+                "src/main/resources/templates/manager.html",
+                "src/main/resources/templates/it.html",
+                "src/main/resources/templates/employee-checklist.html",
+                "src/main/resources/templates/admin-showtimes.html");
+
+        for (String template : templates) {
+            String html = read(template);
+            assertFalse(html.contains("<script>"), "inline <script> should not exist: " + template);
+            assertFalse(html.contains("onchange="), "inline onchange should not exist: " + template);
+            assertTrue(html.contains("legacy-pages.js"), "legacy-pages module missing: " + template);
+        }
+    }
+
+    @Test
+    @DisplayName("首頁應由 vendor-loader 載入 Vue 套件，避免行內 onerror")
+    void shouldUseVendorLoaderWithoutInlineOnerror() throws IOException {
+        String indexHtml = read("src/main/resources/static/index.html");
+        assertTrue(indexHtml.contains("/js/modules/vendor-loader.js"));
+        assertFalse(indexHtml.contains("onerror="));
     }
 
     private static String read(String relativePath) throws IOException {

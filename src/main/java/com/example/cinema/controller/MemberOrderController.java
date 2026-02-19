@@ -29,7 +29,7 @@ import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 
 @RestController
-@RequestMapping("/member/api/orders")
+@RequestMapping({ "/member/api/orders", "/member/api/v1/orders" })
 @Validated
 public class MemberOrderController {
 

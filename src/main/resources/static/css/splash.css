@@ -1,0 +1,132 @@
+#splash-screen {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100vh;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.5s ease, visibility 0.5s ease;
+}
+
+#splash-screen.fade-out {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.splash-content {
+  text-align: center;
+  animation: fadeInUp 1.2s ease-out;
+}
+
+.cinema-title {
+  font-size: 3.5rem;
+  color: #fff;
+  font-weight: 700;
+  margin: 0 0 2rem 0;
+  letter-spacing: 0.1em;
+  animation: titleGlow 2s ease-in-out infinite alternate;
+  font-family: 'Noto Sans TC', sans-serif;
+}
+
+.tagline {
+  font-size: 1.2rem;
+  color: #f0f8ff;
+  margin-top: 2rem;
+  animation: fadeIn 1.5s ease-in 0.5s both;
+  font-family: 'Noto Sans TC', sans-serif;
+}
+
+.spinner-wrapper {
+  margin: 2rem auto;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes titleGlow {
+  0% {
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.3), 0 0 20px rgba(255, 255, 255, 0.2);
+  }
+  100% {
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.5), 0 0 30px rgba(255, 255, 255, 0.3), 0 0 40px rgba(255, 255, 255, 0.2);
+  }
+}
+
+#root {
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .cinema-title {
+    font-size: 2.5rem;
+  }
+
+  .tagline {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .cinema-title {
+    font-size: 2rem;
+  }
+
+  .tagline {
+    font-size: 0.9rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-content,
+  .cinema-title,
+  .tagline,
+  .spinner {
+    animation: none;
+  }
+
+  #splash-screen,
+  #root {
+    transition: none;
+  }
+}

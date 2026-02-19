@@ -71,50 +71,6 @@
         <a href="/">← 回首頁</a>
     </div>
 </main>
-<script>
-    (function() {
-        const logoutForm = document.getElementById('manager-auto-logout');
-        if (!logoutForm) return;
-
-        const INACTIVITY_LIMIT = 10 * 60 * 1000;
-        const HEARTBEAT_INTERVAL = 60 * 1000;
-        const events = ['click', 'mousemove', 'keydown', 'scroll', 'touchstart', 'touchmove'];
-        let triggered = false;
-        let lastHeartbeat = Date.now();
-        let timer = setTimeout(triggerLogout, INACTIVITY_LIMIT);
-
-        function resetTimer() {
-            if (triggered) return;
-            clearTimeout(timer);
-            timer = setTimeout(triggerLogout, INACTIVITY_LIMIT);
-            sendHeartbeat();
-        }
-
-        function triggerLogout() {
-            if (triggered) return;
-            triggered = true;
-            logoutForm.submit();
-        }
-
-        function sendHeartbeat() {
-            const now = Date.now();
-            if (now - lastHeartbeat < HEARTBEAT_INTERVAL) return;
-            lastHeartbeat = now;
-            if (navigator.sendBeacon) {
-                try {
-                    navigator.sendBeacon('/employee/manager/activity', new Blob([], { type: 'text/plain' }));
-                    return;
-                } catch (err) {}
-            }
-            fetch('/employee/manager/activity', { method: 'POST', keepalive: true }).catch(function() {});
-        }
-
-        events.forEach(function(evt) {
-            document.addEventListener(evt, resetTimer, { passive: true });
-        });
-
-        sendHeartbeat();
-    })();
-</script>
+<script defer src="/js/modules/legacy-pages.js?v=20260219-02"></script>
 </body>
 </html>

@@ -55,6 +55,10 @@ mvn spring-boot:run
 - 員工：`/employee/login`
 - 統一入口：`/login?target=member`、`/login?target=employee`
 
+API 路徑：
+- 既有：`/api/**`
+- 版本化別名：`/api/v1/**`（兩者目前行為相同）
+
 ## 3. 資料庫設定
 
 主要設定在 `src/main/resources/application.properties` 與 profile 檔：
@@ -67,6 +71,8 @@ mvn spring-boot:run
 - `DB_USERNAME`
 - `DB_PASSWORD`
 - `APP_TIME_ZONE`（預設 `Asia/Taipei`）
+- `APP_POINT_LOG_RETENTION_DAYS`（預設 `30`）
+- `APP_POINT_LOG_CLEANUP_MS`（預設 `3600000`）
 
 Flyway migration 位置：
 - `src/main/resources/db/migration`
@@ -100,6 +106,7 @@ CI 在 Pull Request 會檢查：
 - 未結束場次期間最多持有 4 張，且只能同一影廳
 - 開演前 30 分鐘內不可取消已付款訂單
 - 座位占用以「場次開始時間」為範圍，不影響下一場
+- 密碼規則：至少 6 碼，且需同時包含英文與數字（不可包含空白）
 
 ## 5. 會員功能
 
@@ -176,3 +183,12 @@ DB_USERNAME='' \
 DB_PASSWORD='' \
 ./scripts/reset-dev-demo-data.sh
 ```
+
+## 11. Docker 本機啟動（可選）
+
+```bash
+docker compose up --build
+```
+
+- App: `http://localhost:8080`
+- MySQL: `localhost:3306`（`/`）

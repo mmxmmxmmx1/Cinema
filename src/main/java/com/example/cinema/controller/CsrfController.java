@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping({ "/api", "/api/v1" })
 public class CsrfController {
 
     @GetMapping("/csrf")
@@ -23,4 +23,3 @@ public class CsrfController {
         return payload;
     }
 }
-

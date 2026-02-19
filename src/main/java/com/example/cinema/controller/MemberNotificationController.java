@@ -23,7 +23,7 @@ import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 
 @RestController
-@RequestMapping("/member/api/notifications")
+@RequestMapping({ "/member/api/notifications", "/member/api/v1/notifications" })
 @Validated
 public class MemberNotificationController {
 

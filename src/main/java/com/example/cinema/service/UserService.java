@@ -28,26 +28,23 @@ import com.example.cinema.exception.UserRegistrationException;
 import com.example.cinema.model.User;
 import com.example.cinema.model.User.UserType;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.tags.Tag;
-
 /**
  * 用戶服務，處理用戶註冊、認證和個人資料管理
  */
 @Service
-@Tag(name = "User Service", description = "處理用戶註冊、認證和個人資料管理")
 public class UserService {
     private static final Logger logger = LoggerFactory.getLogger(UserService.class);
     private static final Pattern ACCOUNT_PATTERN = Pattern.compile("^[A-Za-z0-9]+$");
-    private static final int MIN_PASSWORD_LENGTH = 4;
+    private static final Pattern PASSWORD_HAS_LETTER = Pattern.compile(".*[A-Za-z].*");
+    private static final Pattern PASSWORD_HAS_DIGIT = Pattern.compile(".*\\d.*");
+    private static final int MIN_PASSWORD_LENGTH = 6;
     private static final int MAX_PASSWORD_LENGTH = 100;
     private static final int RESET_TOKEN_EXPIRE_MINUTES = 15;
 
     private final UserDao userDao;
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
+    private volatile Boolean resetTokenStoreEnabled;
     private final Map<String, PasswordResetToken> memberResetTokens = new ConcurrentHashMap<>();
 
     public UserService(UserDao userDao, PasswordEncoder passwordEncoder, JdbcTemplate jdbcTemplate) {
@@ -66,15 +63,11 @@ public class UserService {
      * @return 用戶ID
      * @throws UserRegistrationException 當註冊失敗時拋出
      */
-    @Operation(summary = "註冊新用戶", description = "註冊一個新的用戶帳號")
-    @ApiResponse(responseCode = "200", description = "用戶註冊成功")
-    @ApiResponse(responseCode = "400", description = "無效的輸入參數")
-    @ApiResponse(responseCode = "409", description = "用戶名已存在")
     public Long registerUser(
-            @Parameter(description = "用戶名", required = true) String username,
-            @Parameter(description = "明文密碼", required = true) String rawPassword,
-            @Parameter(description = "用戶類型") UserType userType,
-            @Parameter(description = "是否為管理員") boolean asAdmin) {
+            String username,
+            String rawPassword,
+            UserType userType,
+            boolean asAdmin) {
 
         String safeUsername = normalizeUsername(username);
         validateAccountName(safeUsername);
@@ -116,13 +109,9 @@ public class UserService {
      * @return 員工用戶ID
      * @throws UserRegistrationException 當註冊失敗時拋出
      */
-    @Operation(summary = "註冊新員工", description = "註冊一個新的員工帳號")
-    @ApiResponse(responseCode = "200", description = "員工註冊成功")
-    @ApiResponse(responseCode = "400", description = "無效的輸入參數")
-    @ApiResponse(responseCode = "409", description = "用戶名已存在")
     public Long registerEmployee(
-            @Parameter(description = "員工用戶名", required = true) String username,
-            @Parameter(description = "明文密碼", required = true) String rawPassword) {
+            String username,
+            String rawPassword) {
 
         String safeUsername = normalizeUsername(username);
         validateAccountName(safeUsername);
@@ -157,13 +146,19 @@ public class UserService {
             return null;
         }
 
-        memberResetTokens.entrySet()
-                .removeIf(entry -> safeUsername.equalsIgnoreCase(entry.getValue().username()));
-
         String token = generateResetToken();
-        memberResetTokens.put(token, new PasswordResetToken(
-                safeUsername,
-                AppClock.nowInstant().plus(RESET_TOKEN_EXPIRE_MINUTES, ChronoUnit.MINUTES)));
+        Instant expiresAt = AppClock.nowInstant().plus(RESET_TOKEN_EXPIRE_MINUTES, ChronoUnit.MINUTES);
+        if (isResetTokenStoreEnabled()) {
+            // Invalidate previous active tokens for this member to enforce single active token.
+            jdbcTemplate.update(
+                    "UPDATE member_password_reset_tokens SET used_at = NOW() WHERE member_id = ? AND used_at IS NULL",
+                    member.getId());
+            insertResetTokenWithRetry(member.getId(), token, expiresAt);
+        } else {
+            memberResetTokens.entrySet()
+                    .removeIf(entry -> safeUsername.equalsIgnoreCase(entry.getValue().username()));
+            memberResetTokens.put(token, new PasswordResetToken(safeUsername, expiresAt));
+        }
         return token;
     }
 
@@ -179,15 +174,35 @@ public class UserService {
         }
 
         cleanupExpiredResetTokens();
-        PasswordResetToken resetToken = memberResetTokens.get(safeToken);
-        Instant now = AppClock.nowInstant();
-        if (resetToken == null || resetToken.expiresAt().isBefore(now)
-                || !safeUsername.equalsIgnoreCase(resetToken.username())) {
-            throw new UserRegistrationException("重設碼無效或已過期");
+        if (isResetTokenStoreEnabled()) {
+            User member = userDao.findMemberByUsername(safeUsername)
+                    .orElseThrow(() -> new UserRegistrationException("找不到會員帳號"));
+            Long tokenMemberId = jdbcTemplate.query(
+                    "SELECT member_id FROM member_password_reset_tokens " +
+                            "WHERE token = ? AND used_at IS NULL AND expires_at >= NOW()",
+                    ps -> ps.setString(1, safeToken),
+                    rs -> rs.next() ? rs.getLong("member_id") : null);
+            if (tokenMemberId == null || tokenMemberId.longValue() != member.getId()) {
+                throw new UserRegistrationException("重設碼無效或已過期");
+            }
+            int consumed = jdbcTemplate.update(
+                    "UPDATE member_password_reset_tokens SET used_at = NOW() " +
+                            "WHERE token = ? AND used_at IS NULL AND expires_at >= NOW()",
+                    safeToken);
+            if (consumed <= 0) {
+                throw new UserRegistrationException("重設碼無效或已過期");
+            }
+        } else {
+            PasswordResetToken resetToken = memberResetTokens.get(safeToken);
+            Instant now = AppClock.nowInstant();
+            if (resetToken == null || resetToken.expiresAt().isBefore(now)
+                    || !safeUsername.equalsIgnoreCase(resetToken.username())) {
+                throw new UserRegistrationException("重設碼無效或已過期");
+            }
+            memberResetTokens.remove(safeToken);
         }
 
         updateMemberPassword(safeUsername, newPassword);
-        memberResetTokens.remove(safeToken);
     }
 
     @Transactional
@@ -242,6 +257,12 @@ public class UserService {
         if (safe.length() > MAX_PASSWORD_LENGTH) {
             throw new UserRegistrationException("密碼長度不可超過 " + MAX_PASSWORD_LENGTH + " 碼");
         }
+        if (safe.chars().anyMatch(Character::isWhitespace)) {
+            throw new UserRegistrationException("密碼不可包含空白字元");
+        }
+        if (!PASSWORD_HAS_LETTER.matcher(safe).matches() || !PASSWORD_HAS_DIGIT.matcher(safe).matches()) {
+            throw new UserRegistrationException("密碼需同時包含英文與數字");
+        }
     }
 
     private void updateMemberPassword(String username, String newPassword) {
@@ -269,8 +290,53 @@ public class UserService {
 
     private void cleanupExpiredResetTokens() {
         Instant now = AppClock.nowInstant();
+        if (isResetTokenStoreEnabled()) {
+            // Keep table lean and avoid stale tokens piling up.
+            jdbcTemplate.update(
+                    "DELETE FROM member_password_reset_tokens " +
+                            "WHERE expires_at < ? OR used_at IS NOT NULL",
+                    java.sql.Timestamp.from(now));
+        }
         memberResetTokens.entrySet()
                 .removeIf(entry -> entry.getValue().expiresAt().isBefore(now));
+    }
+
+    private void insertResetTokenWithRetry(long memberId, String token, Instant expiresAt) {
+        final int maxAttempts = 3;
+        String current = token;
+        for (int i = 0; i < maxAttempts; i++) {
+            try {
+                jdbcTemplate.update(
+                        "INSERT INTO member_password_reset_tokens (token, member_id, expires_at) VALUES (?, ?, ?)",
+                        current,
+                        memberId,
+                        java.sql.Timestamp.from(expiresAt));
+                return;
+            } catch (DuplicateKeyException ex) {
+                current = generateResetToken();
+            }
+        }
+        throw new UserRegistrationException("重設碼建立失敗，請稍後再試。");
+    }
+
+    private boolean isResetTokenStoreEnabled() {
+        Boolean cached = resetTokenStoreEnabled;
+        if (Boolean.TRUE.equals(cached)) {
+            return true;
+        }
+        try {
+            Integer probe = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM member_password_reset_tokens WHERE 1 = 0",
+                    Integer.class);
+            if (probe == null) {
+                resetTokenStoreEnabled = Boolean.FALSE;
+                return false;
+            }
+            resetTokenStoreEnabled = Boolean.TRUE;
+        } catch (DataAccessException ex) {
+            resetTokenStoreEnabled = Boolean.FALSE;
+        }
+        return resetTokenStoreEnabled.booleanValue();
     }
 
     /**
@@ -280,12 +346,9 @@ public class UserService {
      * @param movieIds 要合併的電影ID集合
      */
     @Transactional
-    @Operation(summary = "合併觀看清單", description = "將訪客的觀看清單合併到登入用戶的帳號")
-    @ApiResponse(responseCode = "200", description = "清單合併成功")
-    @ApiResponse(responseCode = "400", description = "無效的輸入參數")
     public void mergeGuestWatchlistIntoUser(
-            @Parameter(description = "目標用戶名", required = true) String username,
-            @Parameter(description = "要合併的電影ID集合") Collection<Long> movieIds) {
+            String username,
+            Collection<Long> movieIds) {
         
         logger.debug("開始合併觀看清單，用戶: {}", username);
         

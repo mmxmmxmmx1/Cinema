@@ -12,6 +12,30 @@ body {
   background-color: #1a1a1a;
   color: #fff;
   line-height: 1.6;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -48px;
+  background: #1f3f8f;
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 8px;
+  text-decoration: none;
+  z-index: 3000;
+  transition: top 0.2s ease;
+}
+
+.skip-link:focus {
+  top: 12px;
+}
+
+:focus-visible {
+  outline: 2px solid #8db3ff;
+  outline-offset: 2px;
 }
 
 html {
@@ -1394,5 +1418,20 @@ html {
   
   .movie-grid {
     padding: clamp(2rem, 4vw, 3rem) clamp(2.5rem, 4vw, 3.5rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .hero-carousel-track {
+    transition: none !important;
   }
 }

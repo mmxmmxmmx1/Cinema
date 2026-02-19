@@ -46,7 +46,7 @@ public class SecurityConfig {
             "img-src 'self' https: data:",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "font-src 'self' https://fonts.gstatic.com data:",
-            "script-src 'self' 'unsafe-inline' https://unpkg.com",
+            "script-src 'self'",
             "connect-src 'self'",
             "object-src 'none'",
             "base-uri 'self'",
@@ -55,13 +55,13 @@ public class SecurityConfig {
 
     // The SPA uses Vue templates defined as strings in JS, which requires runtime compilation.
     // Vue's runtime compiler relies on `new Function(...)` (blocked by CSP unless 'unsafe-eval' is allowed).
-    // Keep this relaxed CSP scoped to the public SPA pages only.
+    // Keep this scoped CSP relaxation only for the public SPA pages.
     private static final String SPA_CSP = String.join("; ",
             "default-src 'self'",
             "img-src 'self' https: data:",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "font-src 'self' https://fonts.gstatic.com data:",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com",
+            "script-src 'self' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net",
             "connect-src 'self'",
             "object-src 'none'",
             "base-uri 'self'",
@@ -368,16 +368,20 @@ public class SecurityConfig {
                         "/webjars/**", "/assets/**")
                 .permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/api/csrf").permitAll()
+                .requestMatchers("/api/v1/csrf").permitAll()
                 .requestMatchers("/api/health").permitAll()
+                .requestMatchers("/api/v1/health").permitAll()
                 .requestMatchers("/api/guest/**", "/api/movies/**").permitAll()
+                .requestMatchers("/api/v1/guest/**", "/api/v1/movies/**").permitAll()
                 .requestMatchers("/movies/**").permitAll() // 加這行
                 .anyRequest().authenticated())
                 // Only ignore CSRF for guest APIs used by the SPA without a token.
                 // Keep CSRF enabled elsewhere to avoid widening the attack surface.
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository())
-                        .ignoringRequestMatchers("/api/guest/**"));
+                        .ignoringRequestMatchers("/api/guest/**", "/api/v1/guest/**"));
 
         http.headers(headers -> headers
                 .contentSecurityPolicy(csp -> csp.policyDirectives(SPA_CSP))

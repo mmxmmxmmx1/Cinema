@@ -6,6 +6,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -23,6 +26,7 @@ import com.example.cinema.model.User;
 
 @Service
 public class MemberLoyaltyService {
+    private static final Logger log = LoggerFactory.getLogger(MemberLoyaltyService.class);
 
     private static final int POINTS_PER_NTD = 10;
     private static final List<RewardOption> REWARD_OPTIONS = List.of(
@@ -38,10 +42,15 @@ public class MemberLoyaltyService {
     public MemberLoyaltyService(
             JdbcTemplate jdbcTemplate,
             UserDao userDao,
-            @Value("${app.point-log.retention-days:30}") int pointLogRetentionDays) {
+            @Value("${app.point-log.retention-days:30}") int pointLogRetentionDays,
+            @Value("${app.point-log.cleanup-ms:3600000}") long pointLogCleanupMs) {
         this.jdbcTemplate = jdbcTemplate;
         this.userDao = userDao;
         this.pointLogRetentionDays = Math.max(1, pointLogRetentionDays);
+        if (pointLogCleanupMs < 60_000L) {
+            log.warn("app.point-log.cleanup-ms={} too small, effective cleanup is controlled by @Scheduled configuration.",
+                    pointLogCleanupMs);
+        }
     }
 
     public int currentPoints(String memberUsername) {
@@ -127,12 +136,56 @@ public class MemberLoyaltyService {
                 .findFirst()
                 .orElseThrow(() -> new TicketPurchaseRuleViolationException("找不到該兌換項目。"));
 
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        if (isPointLedgerEnabled()) {
+            // Atomic deduction: avoid race conditions where concurrent requests over-spend points.
+            int deducted = jdbcTemplate.update(
+                    "UPDATE member_point_balance SET points_balance = points_balance - ?, updated_at = NOW() " +
+                            "WHERE member_id = ? AND points_balance >= ?",
+                    reward.pointsCost(),
+                    member.getId(),
+                    reward.pointsCost());
+            if (deducted <= 0) {
+                throw new TicketPurchaseRuleViolationException("點數不足，無法兌換「" + reward.name() + "」。");
+            }
+
+            jdbcTemplate.update(con -> {
+                var ps = con.prepareStatement(
+                        "INSERT INTO member_point_redemptions (member_id, reward_code, reward_name, points_spent, note) VALUES (?, ?, ?, ?, ?)",
+                        new String[] { "id" });
+                ps.setLong(1, member.getId());
+                ps.setString(2, reward.code());
+                ps.setString(3, reward.name());
+                ps.setInt(4, reward.pointsCost());
+                ps.setString(5, "會員手動兌換");
+                return ps;
+            }, keyHolder);
+
+            long redemptionId = extractGeneratedId(keyHolder);
+            if (redemptionId > 0) {
+                String eventKey = "REDEEM:" + redemptionId;
+                jdbcTemplate.update(
+                        "INSERT IGNORE INTO member_point_ledger " +
+                                "(member_id, event_key, event_type, ref_redemption_id, amount, points_delta, description, happened_at) " +
+                                "VALUES (?, ?, 'REDEEM', ?, 0, ?, ?, NOW())",
+                        member.getId(),
+                        eventKey,
+                        redemptionId,
+                        -reward.pointsCost(),
+                        "點數兌換：" + reward.name());
+            }
+
+            Integer updated = jdbcTemplate.queryForObject(
+                    "SELECT points_balance FROM member_point_balance WHERE member_id = ?",
+                    Integer.class,
+                    member.getId());
+            return Math.max(0, updated == null ? 0 : updated.intValue());
+        }
+
         int available = currentPoints(memberUsername);
         if (available < reward.pointsCost()) {
             throw new TicketPurchaseRuleViolationException("點數不足，無法兌換「" + reward.name() + "」。");
         }
-
-        KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(con -> {
             var ps = con.prepareStatement(
                     "INSERT INTO member_point_redemptions (member_id, reward_code, reward_name, points_spent, note) VALUES (?, ?, ?, ?, ?)",
@@ -144,16 +197,6 @@ public class MemberLoyaltyService {
             ps.setString(5, "會員手動兌換");
             return ps;
         }, keyHolder);
-
-        long redemptionId = extractGeneratedId(keyHolder);
-        if (isPointLedgerEnabled() && redemptionId > 0) {
-            applyRedeemLedger(member.getId(), redemptionId, reward);
-            Integer updated = jdbcTemplate.queryForObject(
-                    "SELECT points_balance FROM member_point_balance WHERE member_id = ?",
-                    Integer.class,
-                    member.getId());
-            return Math.max(0, updated == null ? 0 : updated.intValue());
-        }
         return Math.max(0, available - reward.pointsCost());
     }
 
@@ -216,6 +259,24 @@ public class MemberLoyaltyService {
                 toTimestamp(happenedAt));
         if (inserted > 0) {
             incrementPointBalance(memberId, -points);
+        }
+    }
+
+    @Scheduled(fixedDelayString = "${app.point-log.cleanup-ms:3600000}")
+    public void purgeExpiredPointLogs() {
+        if (!isPointLedgerEnabled()) {
+            return;
+        }
+        Timestamp cutoff = Timestamp.from(pointLogCutoff());
+        try {
+            int deleted = jdbcTemplate.update(
+                    "DELETE FROM member_point_ledger WHERE happened_at < ?",
+                    cutoff);
+            if (deleted > 0) {
+                log.info("Purged {} expired point logs older than {} day(s).", deleted, pointLogRetentionDays);
+            }
+        } catch (DataAccessException ex) {
+            log.debug("Skip point-log cleanup sweep: {}", ex.getMessage());
         }
     }
 
@@ -286,22 +347,6 @@ public class MemberLoyaltyService {
 
     private Instant pointLogCutoff() {
         return AppClock.nowInstant().minus(pointLogRetentionDays, ChronoUnit.DAYS);
-    }
-
-    private void applyRedeemLedger(long memberId, long redemptionId, RewardOption reward) {
-        String eventKey = "REDEEM:" + redemptionId;
-        int inserted = jdbcTemplate.update(
-                "INSERT IGNORE INTO member_point_ledger " +
-                        "(member_id, event_key, event_type, ref_redemption_id, amount, points_delta, description, happened_at) " +
-                        "VALUES (?, ?, 'REDEEM', ?, 0, ?, ?, NOW())",
-                memberId,
-                eventKey,
-                redemptionId,
-                -reward.pointsCost(),
-                "點數兌換：" + reward.name());
-        if (inserted > 0) {
-            incrementPointBalance(memberId, -reward.pointsCost());
-        }
     }
 
     private void incrementPointBalance(long memberId, int delta) {

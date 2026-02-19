@@ -36,7 +36,7 @@
     <section>
         <form method="get" action="/employee/admin/showtimes">
             <label for="movieId">選擇電影</label>
-            <select id="movieId" name="movieId" onchange="this.form.submit()">
+            <select id="movieId" name="movieId" data-auto-submit="true">
                 <option th:each="m : ${movies}" th:value="${m.id}" th:text="${m.title}" th:selected="${m.id == selectedMovieId}">電影</option>
             </select>
         </form>
@@ -107,5 +107,6 @@
         <a href="/employee/admin/dashboard">← 回管理首頁</a>
     </section>
 </main>
+<script defer src="/js/modules/legacy-pages.js?v=20260219-02"></script>
 </body>
 </html>

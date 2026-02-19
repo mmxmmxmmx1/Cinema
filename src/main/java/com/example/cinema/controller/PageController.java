@@ -31,6 +31,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
@@ -66,8 +67,7 @@ public class PageController {
             @RequestParam(value = "target", required = false) String target,
             @RequestParam(value = "error", required = false) String error,
             @RequestParam(value = "returnTo", required = false) String returnTo,
-            HttpSession session,
-            Model model) {
+            HttpSession session) {
 
         String normalized = target == null ? "" : target.trim().toLowerCase();
         boolean memberTarget = normalized.isEmpty() || "member".equals(normalized);
@@ -81,15 +81,15 @@ public class PageController {
             return "redirect:/employee";
         }
 
-        // This page is a wrapper: it posts to /member/login or /employee/login so that the correct
-        // SecurityFilterChain handles authentication.
-        model.addAttribute("formAction", employeeTarget ? "/employee/login" : "/member/login");
-        model.addAttribute("targetLabel", employeeTarget ? "員工" : "會員");
-        model.addAttribute("returnTo", returnTo);
+        String targetLoginPath = employeeTarget ? "/employee/login" : "/member/login";
+        UriComponentsBuilder redirect = UriComponentsBuilder.fromPath(targetLoginPath);
         if (error != null) {
-            model.addAttribute("error", "帳號或密碼不正確,請再試一次。");
+            redirect.queryParam("error");
         }
-        return "login";
+        if (returnTo != null && !returnTo.isBlank()) {
+            redirect.queryParam("returnTo", returnTo);
+        }
+        return "redirect:" + redirect.toUriString();
     }
 
     @GetMapping({ "/member/login", "/member/login/" })

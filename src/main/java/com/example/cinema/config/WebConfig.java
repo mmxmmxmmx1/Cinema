@@ -48,11 +48,37 @@ public class WebConfig implements WebMvcConfigurer {
                             if (p.startsWith("member/") || p.startsWith("employee/") || p.startsWith("api/")) {
                                 return null;
                             }
+                            Resource requestedResource = location.createRelative(resourcePath);
+                            if (requestedResource.exists() && requestedResource.isReadable()) {
+                                return requestedResource;
+                            }
+                            // Only fallback to SPA entry for known client routes.
+                            // Unknown paths should keep normal 404 behavior instead of always returning index.html.
+                            if (isSpaClientRoute(p)) {
+                                return new ClassPathResource("/static/index.html");
+                            }
+                            return null;
                         }
-                        Resource requestedResource = location.createRelative(resourcePath);
-                        return requestedResource.exists() && requestedResource.isReadable()
-                                ? requestedResource
-                                : new ClassPathResource("/static/index.html");
+                        return null;
+                    }
+
+                    private boolean isSpaClientRoute(String path) {
+                        if (path == null) {
+                            return false;
+                        }
+                        String normalized = path.trim();
+                        if (normalized.isEmpty() || "index.html".equals(normalized)) {
+                            return true;
+                        }
+                        if (normalized.contains(".")) {
+                            return false;
+                        }
+                        return normalized.equals("movies")
+                                || normalized.startsWith("movies/")
+                                || normalized.equals("checkout")
+                                || normalized.startsWith("checkout/")
+                                || normalized.equals("orders")
+                                || normalized.startsWith("orders/");
                     }
                 });
     }

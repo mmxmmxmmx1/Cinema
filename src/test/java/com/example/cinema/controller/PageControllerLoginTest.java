@@ -4,9 +4,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,10 +37,8 @@ class PageControllerLoginTest {
         when(sessionService.isAuthenticated(any(), eq(Realm.EMPLOYEE))).thenReturn(false);
 
         mockMvc.perform(get("/login"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("login"))
-                .andExpect(model().attribute("formAction", "/member/login"))
-                .andExpect(model().attribute("targetLabel", "會員"));
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/member/login"));
     }
 
     @Test
@@ -50,10 +47,7 @@ class PageControllerLoginTest {
         when(sessionService.isAuthenticated(any(), eq(Realm.EMPLOYEE))).thenReturn(false);
 
         mockMvc.perform(get("/login").param("target", "employee"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("login"))
-                .andExpect(model().attribute("formAction", "/employee/login"))
-                .andExpect(model().attribute("targetLabel", "員工"));
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/employee/login"));
     }
 }
-

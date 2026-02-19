@@ -198,7 +198,7 @@
             </div>
           </div>
 
-          <span v-if="actionError" class="auth-hint auth-hint-error">{{ actionError }}</span>
+          <span v-if="actionError" class="auth-hint auth-hint-error" role="alert" aria-live="assertive">{{ actionError }}</span>
         </div>
 
         <div v-if="showRegisterModal" class="auth-modal-mask">
@@ -217,15 +217,16 @@
               </label>
               <label>
                 密碼
-                <input v-model="registerForm.password" type="password" maxlength="100" autocomplete="new-password" placeholder="請輸入密碼" required>
+                <input v-model="registerForm.password" type="password" minlength="6" maxlength="100" autocomplete="new-password" placeholder="請輸入密碼" required>
+                <small class="auth-field-help">至少 6 碼，需同時包含英文與數字</small>
               </label>
               <label>
                 確認密碼
-                <input v-model="registerForm.confirmPassword" type="password" maxlength="100" autocomplete="new-password" placeholder="再次輸入密碼" required>
+                <input v-model="registerForm.confirmPassword" type="password" minlength="6" maxlength="100" autocomplete="new-password" placeholder="再次輸入密碼" required>
               </label>
 
-              <div v-if="registerError" class="auth-modal-message error">{{ registerError }}</div>
-              <div v-if="registerSuccess" class="auth-modal-message success">{{ registerSuccess }}</div>
+              <div v-if="registerError" class="auth-modal-message error" role="alert" aria-live="assertive">{{ registerError }}</div>
+              <div v-if="registerSuccess" class="auth-modal-message success" role="status" aria-live="polite">{{ registerSuccess }}</div>
 
               <div class="auth-register-actions">
                 <button type="submit" class="floating-button register submit" :disabled="registerSubmitting">
@@ -402,6 +403,18 @@
         }
         if (!password) {
           this.registerError = '請輸入密碼。';
+          return;
+        }
+        if (password.length < 6) {
+          this.registerError = '密碼長度至少 6 碼。';
+          return;
+        }
+        if (/\\s/.test(password)) {
+          this.registerError = '密碼不可包含空白字元。';
+          return;
+        }
+        if (!/[A-Za-z]/.test(password) || !/\\d/.test(password)) {
+          this.registerError = '密碼需同時包含英文與數字。';
           return;
         }
         if (password !== confirmPassword) {
@@ -656,7 +669,7 @@
       >
         <div class="hero-inner">
           <span class="hero-label">現正熱映中</span>
-          <img class="hero-badge" src="/images/sleep.jpg" alt="Very Sleepy Cinema 徽章">
+          <img class="hero-badge" src="/images/sleep.jpg" alt="Very Sleepy Cinema 徽章" loading="eager" decoding="async" fetchpriority="high">
           <div class="hero-text">
             <h1>很好睡電影院</h1>
             <p class="hero-tagline">每個顧客都可以睡得很安穩</p>
@@ -671,7 +684,9 @@
                   class="hero-slide-image"
                   :src="slide.imageUrl"
                   :alt="slide.title"
-                  loading="eager"
+                  :loading="index === activeIndex ? 'eager' : 'lazy'"
+                  decoding="async"
+                  :fetchpriority="index === activeIndex ? 'high' : 'low'"
                   @error="onImageError"
                 >
                 <div class="hero-slide-overlay"></div>
@@ -717,6 +732,7 @@
               class="hero-dot"
               :class="{ active: index === activeIndex }"
               :aria-label="'第 ' + (index + 1) + ' 張'"
+              :aria-current="index === activeIndex ? 'true' : null"
               @click="goToSlide(index)"
             ></button>
           </div>

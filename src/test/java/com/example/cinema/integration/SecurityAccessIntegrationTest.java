@@ -122,4 +122,12 @@ class SecurityAccessIntegrationTest {
                 .andExpect(header().string("Strict-Transport-Security", Matchers.containsString("max-age=31536000")))
                 .andExpect(header().string("Strict-Transport-Security", Matchers.containsString("includeSubDomains")));
     }
+
+    @Test
+    @DisplayName("v1 API 別名應可匿名存取健康檢查")
+    void shouldAllowAnonymousAccessToV1HealthApi() throws Exception {
+        mockMvc.perform(get("/api/v1/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
+    }
 }
