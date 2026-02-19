@@ -21,6 +21,7 @@
         .ok { color: #b9ffda; }
         .err { color: #ffb1b1; }
         a { color: #8ec7ff; text-decoration: none; }
+        .section-title { margin-top: 0; }
     </style>
 </head>
 <body>
@@ -42,7 +43,7 @@
     </section>
 
     <section>
-        <h2 style="margin-top:0;">新增/更新場次</h2>
+        <h2 class="section-title">新增/更新場次</h2>
         <form method="post" action="/employee/admin/showtimes/save">
             <input type="hidden" th:name="${_csrf != null ? _csrf.parameterName : '_csrf'}" th:value="${_csrf != null ? _csrf.token : ''}">
             <input type="hidden" name="movieId" th:value="${selectedMovieId}">
@@ -71,7 +72,7 @@
     </section>
 
     <section>
-        <h2 style="margin-top:0;">目前場次</h2>
+        <h2 class="section-title">目前場次</h2>
         <div th:if="${showtimes == null || #lists.isEmpty(showtimes)}">目前沒有場次。</div>
         <table th:if="${showtimes != null && !#lists.isEmpty(showtimes)}">
             <thead>

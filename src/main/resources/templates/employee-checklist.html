@@ -31,6 +31,13 @@
         }
         .btn-secondary { background: #4d5f8f; }
         .btn-secondary:hover { background: #5d73ab; }
+        .date-filter-form {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .date-input { max-width: 220px; }
     </style>
 </head>
 <body>
@@ -44,9 +51,9 @@
     <section th:if="${error}" class="flash-err" th:text="${error}">儲存失敗</section>
 
     <section>
-        <form method="get" action="/employee/checklist" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <form method="get" action="/employee/checklist" class="date-filter-form">
             <label for="check-date">檢查日期</label>
-            <input id="check-date" name="date" type="date" th:value="${checkDate}" th:max="${maxCheckDate}" style="max-width: 220px;">
+            <input id="check-date" name="date" type="date" th:value="${checkDate}" th:max="${maxCheckDate}" class="date-input">
             <button type="submit" class="btn">切換日期</button>
         </form>
     </section>

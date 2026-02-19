@@ -43,6 +43,13 @@
             background: #5d73ab;
             text-decoration: none;
         }
+        .section-title { margin-top: 0; }
+        .footer-links {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
     </style>
 </head>
 <body>
@@ -54,7 +61,7 @@
     <section th:if="${error}" class="err" th:text="${error}">送出失敗</section>
 
     <section>
-        <h2 style="margin-top:0;">新增申請</h2>
+        <h2 class="section-title">新增申請</h2>
         <form method="post" action="/employee/maintenance" th:object="${form}">
             <input type="hidden" th:name="${_csrf != null ? _csrf.parameterName : '_csrf'}" th:value="${_csrf != null ? _csrf.token : ''}">
             <label for="hall">影廳（可選）</label>
@@ -82,7 +89,7 @@
     </section>
 
     <section>
-        <h2 style="margin-top:0;">最近申請紀錄</h2>
+        <h2 class="section-title">最近申請紀錄</h2>
         <div th:if="${requests == null || #lists.isEmpty(requests)}">目前沒有維修申請。</div>
         <table th:if="${requests != null && !#lists.isEmpty(requests)}">
             <thead>
@@ -127,9 +134,8 @@
         </table>
     </section>
 
-    <section>
+    <section class="footer-links">
         <a class="btn-link" href="/employee">← 返回員工首頁</a>
-        <span style="margin-left: 12px;"></span>
         <a class="btn-link" href="/">回到網站首頁</a>
     </section>
 </main>

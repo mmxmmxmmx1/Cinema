@@ -198,7 +198,7 @@
             </div>
           </div>
 
-          <span v-if="actionError" class="auth-hint" style="color:#ff9a9a;">{{ actionError }}</span>
+          <span v-if="actionError" class="auth-hint auth-hint-error">{{ actionError }}</span>
         </div>
 
         <div v-if="showRegisterModal" class="auth-modal-mask">
@@ -213,7 +213,7 @@
               <label>
                 帳號
                 <input v-model.trim="registerForm.nickname" type="text" maxlength="100" pattern="[A-Za-z0-9]+" autocomplete="username" placeholder="例如：newmember" required>
-                <small style="color:#9fb4ea;">僅限英文與數字（不可使用中文或符號）</small>
+                <small class="auth-field-help">僅限英文與數字（不可使用中文或符號）</small>
               </label>
               <label>
                 密碼

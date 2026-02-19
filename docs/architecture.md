@@ -18,7 +18,7 @@
 
 - 場次座位唯一鍵：`(show_start_at, showtime_id, seat_id)`，防止同場同座重複售出。
 - 付款冪等：`payment_idempotency` 防止重複扣款。
-- 通知保留：站內通知預設保留 7 天並定時清理。
+- 通知保留：站內通知預設保留 30 天並定時清理。
 - 全站閒置登出：`server.servlet.session.timeout=10m`。
 - API 防刷：會員下單/付款/取消與通知已讀具備每分鐘限流。
 

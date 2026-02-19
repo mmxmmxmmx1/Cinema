@@ -178,6 +178,12 @@ a.member-link:hover,
   border-radius: 12px;
 }
 
+.member-flash.success {
+  background: rgba(88, 255, 161, 0.16);
+  border: 1px solid rgba(88, 255, 161, 0.35);
+  color: #ccffe5;
+}
+
 .member-flash.error {
   background: rgba(255, 107, 107, 0.18);
   border: 1px solid rgba(255, 107, 107, 0.5);
@@ -192,6 +198,47 @@ a.member-link:hover,
 
 .member-danger:hover {
   background: rgba(255, 107, 107, 0.26);
+}
+
+.member-error-text {
+  color: #ff9a9a;
+}
+
+.member-success-text {
+  color: #ccffe5;
+}
+
+.member-actions-top {
+  margin-top: 14px;
+}
+
+.member-form-inline-end {
+  align-items: end;
+}
+
+.member-actions-tight {
+  margin-top: 8px;
+}
+
+.member-links-inline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.member-redeem-actions {
+  margin-top: 12px;
+}
+
+.member-form-grid {
+  display: grid;
+  gap: 14px;
+  max-width: 420px;
+}
+
+.member-input-full {
+  width: 100%;
 }
 
 @media (max-width: 720px) {

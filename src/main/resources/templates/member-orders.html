@@ -19,7 +19,7 @@
         通知訊息只保留 30 天，逾期自動清除。
     </div>
     <div th:if="${error}" class="member-flash error" th:text="${error}">無法載入訂單</div>
-    <div th:if="${success}" class="member-flash" th:text="${success}" style="background: rgba(88, 255, 161, 0.16); border: 1px solid rgba(88, 255, 161, 0.35); color: #ccffe5;">取消成功</div>
+    <div th:if="${success}" class="member-flash success" th:text="${success}">取消成功</div>
 
     <div class="member-card"
          th:if="${(pendingOrFailedOrders == null || #lists.isEmpty(pendingOrFailedOrders)) and
@@ -48,7 +48,7 @@
                 <div class="member-meta" th:if="${o.pendingRemainLabel != null && !#strings.isEmpty(o.pendingRemainLabel)}" th:text="${o.pendingRemainLabel}">
                     待付款，剩餘約 10 分鐘。
                 </div>
-                <div class="member-actions" style="margin-top: 8px;">
+                <div class="member-actions member-actions-tight">
                     <form method="post" th:if="${o.cancellable}" th:action="@{'/member/orders/' + ${o.orderId} + '/cancel'}">
                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                         <button type="submit" class="member-btn member-danger">取消訂單</button>
@@ -78,7 +78,7 @@
                 <div class="member-order-meta" th:if="${o.paidAt != null && !#strings.isEmpty(o.paidAt)}" th:text="${'付款 ' + o.paidAt}">
                     付款 2026-02-10 12:01
                 </div>
-                <div class="member-actions" style="margin-top: 8px;">
+                <div class="member-actions member-actions-tight">
                     <form method="post" th:if="${o.cancellable}" th:action="@{'/member/orders/' + ${o.orderId} + '/cancel'}">
                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                         <button type="submit" class="member-btn member-danger">取消訂單</button>
@@ -153,9 +153,8 @@
         </li>
     </ul>
 
-    <div class="member-card">
+    <div class="member-card member-links-inline">
         <a href="/member">← 回會員專區</a>
-        <span style="margin-left: 12px;"></span>
         <a href="/">回到購票首頁</a>
     </div>
 </main>

@@ -15,6 +15,10 @@
         .err { color: #ffd7d7; background: rgba(255, 107, 107, 0.18); border: 1px solid rgba(255, 107, 107, 0.5); padding: 10px 12px; border-radius: 12px; }
         a { color: #9ad0ff; text-decoration: none; }
         a:hover { text-decoration: underline; }
+        .spacer-sm { height: 8px; }
+        .spacer-md { height: 10px; }
+        .spacer-lg { height: 16px; }
+        .poster-input { width: min(100%, 680px); }
     </style>
 </head>
 <body>
@@ -40,37 +44,37 @@
             <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <button type="submit">立即執行逾時訂單檢查</button>
         </form>
-        <div style="height: 10px;"></div>
+        <div class="spacer-md"></div>
         <form method="post" action="/employee/admin/tools/purge-notifications">
             <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <button type="submit">立即清理過期通知</button>
         </form>
-        <div style="height: 10px;"></div>
+        <div class="spacer-md"></div>
         <form method="post" action="/employee/admin/tools/repair-order-status">
             <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <button type="submit">修復訂單狀態並釋放異常座位</button>
         </form>
-        <div style="height: 10px;"></div>
+        <div class="spacer-md"></div>
         <form method="post" action="/employee/admin/tools/recalculate-points">
             <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <button type="submit">重算所有會員點數</button>
         </form>
-        <div style="height: 10px;"></div>
+        <div class="spacer-md"></div>
         <form method="post" action="/employee/admin/tools/reset-todos">
             <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <button type="submit">重置今日待辦為預設值</button>
         </form>
-        <div style="height: 16px;"></div>
+        <div class="spacer-lg"></div>
         <form method="post" action="/employee/admin/tools/update-poster">
             <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <label for="movieId">電影：</label>
             <select id="movieId" name="movieId" required>
                 <option th:each="m : ${catalogItems}" th:value="${m.id()}" th:text="${m.id() + '｜' + m.title()}">mv-01｜沙丘:第二部</option>
             </select>
-            <div style="height: 8px;"></div>
+            <div class="spacer-sm"></div>
             <label for="posterUrl">海報網址（https://... 或 /images/...）：</label>
-            <input id="posterUrl" name="posterUrl" type="text" style="width: min(100%, 680px);" required>
-            <div style="height: 10px;"></div>
+            <input id="posterUrl" name="posterUrl" type="text" class="poster-input" required>
+            <div class="spacer-md"></div>
             <button type="submit">更新海報網址</button>
         </form>
     </section>

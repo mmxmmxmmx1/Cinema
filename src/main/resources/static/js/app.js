@@ -95,7 +95,7 @@ const MovieDetailPage = {
               <h2>{{ movie.title }}</h2>
               <p>{{ movie.description }}</p>
               <h3>場次資訊</h3>
-              <div v-if="!movie.showtimes || movie.showtimes.length === 0" class="error-state" style="padding: 1rem 0; text-align: left;">
+              <div v-if="!movie.showtimes || movie.showtimes.length === 0" class="error-state error-state-inline-left">
                 目前沒有可訂購的場次（每日 07:00 - 22:45 開放）。
               </div>
               <ul v-else class="showtime-list">
@@ -165,8 +165,8 @@ const SeatSelectionPage = {
               </div>
             </div>
             <div class="selection-summary">
-              <div v-if="purchaseError" class="error-state" style="margin-bottom: 10px;">{{ purchaseError }}</div>
-              <div v-if="purchaseSuccess" class="loading" style="margin-bottom: 10px;">{{ purchaseSuccess }}</div>
+              <div v-if="purchaseError" class="state-message state-message-error">{{ purchaseError }}</div>
+              <div v-if="purchaseSuccess" class="state-message state-message-success">{{ purchaseSuccess }}</div>
               <div>
                 <strong>已選座位：</strong>
                 {{ selectedSeats.length > 0 ? selectedSeats.join(', ') : '尚未選擇' }}
@@ -331,11 +331,11 @@ const CheckoutPage = {
               <p><strong>張數：</strong>{{ seatIds.length }}</p>
               <p><strong>票價：</strong>{{ unitPrice }} / 張</p>
               <p><strong>總價：</strong>{{ totalPrice }}</p>
-              <p v-if="alreadyPaidOrder" style="margin-bottom: 0.5rem;">
+              <p v-if="alreadyPaidOrder" class="checkout-payment-state">
                 <strong>付款狀態：</strong>
                 已付款（訂單 #{{ alreadyPaidOrder.orderId }}）
               </p>
-              <p v-else style="margin-bottom: 0.5rem;">
+              <p v-else class="checkout-payment-state">
                 <strong>付款模擬：</strong>
                 <select v-model="paymentMode">
                   <option value="SUCCESS">成功</option>
@@ -344,10 +344,10 @@ const CheckoutPage = {
                 </select>
               </p>
 
-              <div v-if="payError" class="error-state" style="margin-top: 14px;">{{ payError }}</div>
-              <div v-if="paySuccess" class="loading" style="margin-top: 14px;">{{ paySuccess }}</div>
+              <div v-if="payError" class="state-message state-message-error mt-14">{{ payError }}</div>
+              <div v-if="paySuccess" class="state-message state-message-success mt-14">{{ paySuccess }}</div>
 
-              <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
+              <div class="action-row">
                 <button v-if="!alreadyPaidOrder && !paySuccess" type="button" :disabled="paying" @click="confirmPay">
                   {{ paying ? '付款處理中…' : '確認付款' }}
                 </button>
@@ -357,7 +357,7 @@ const CheckoutPage = {
                 <button type="button" class="primary-link" @click="goToOrders">我的訂單</button>
                 <button v-if="alreadyPaidOrder" type="button" class="primary-link" @click="goToOrderDetail">查看該筆訂單</button>
               </div>
-              <p style="margin-top: 12px; color: #b9bedb; line-height: 1.6;">
+              <p class="checkout-rule-note">
                 規則：一次最多 4 張；6 小時內最多 4 張，且只能同一個影廳，不能跨影廳。
               </p>
             </div>
@@ -742,12 +742,12 @@ const OrdersPage = {
     <div class="app-shell">
       <div class="page">
         <button class="back-link" @click="goBack">返回</button>
-        <h2 style="margin-top: 0;">我的訂單</h2>
+        <h2 class="order-heading">我的訂單</h2>
         <LoadingState v-if="loading" />
         <ErrorState v-else-if="error" :message="error" />
         <template v-else>
           <div v-if="orders.length === 0" class="loading">目前沒有訂單</div>
-          <ul v-else class="showtime-list" style="list-style: none; padding: 0;">
+          <ul v-else class="showtime-list list-reset">
             <li v-for="o in orders" :key="o.orderId" class="showtime-item">
               <div class="showtime-meta">
                 <strong>#{{ o.orderId }}</strong>
@@ -791,16 +791,16 @@ const OrderDetailPage = {
         <LoadingState v-if="loading" />
         <ErrorState v-else-if="error" :message="error" />
         <template v-else>
-          <h2 style="margin-top: 0;">訂單 #{{ order.orderId }}</h2>
+          <h2 class="order-heading">訂單 #{{ order.orderId }}</h2>
           <p><strong>狀態：</strong>{{ order.status }}</p>
           <p><strong>影廳：</strong>{{ order.auditorium }}</p>
           <p><strong>座位：</strong>{{ order.seatIds.join(', ') }}</p>
-          <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
+          <div class="action-row">
             <button v-if="order.status === 'PENDING'" type="button" @click="cancel">取消訂單</button>
             <button type="button" class="primary-link" @click="goOrders">回列表</button>
           </div>
-          <div v-if="actionError" class="error-state" style="margin-top: 14px;">{{ actionError }}</div>
-          <div v-if="actionSuccess" class="loading" style="margin-top: 14px;">{{ actionSuccess }}</div>
+          <div v-if="actionError" class="state-message state-message-error mt-14">{{ actionError }}</div>
+          <div v-if="actionSuccess" class="state-message state-message-success mt-14">{{ actionSuccess }}</div>
         </template>
       </div>
     </div>

@@ -14,7 +14,7 @@
     <p class="member-subtitle">最近的點數累積明細</p>
 </header>
 <main class="member-main">
-    <div th:if="${success}" class="member-flash" th:text="${success}" style="background: rgba(88, 255, 161, 0.16); border: 1px solid rgba(88, 255, 161, 0.35); color: #ccffe5;">兌換成功</div>
+    <div th:if="${success}" class="member-flash success" th:text="${success}">兌換成功</div>
     <div th:if="${error}" class="member-flash error" th:text="${error}">兌換失敗</div>
 
     <section class="member-card">
@@ -31,7 +31,7 @@
             <select id="rewardCode" name="rewardCode">
                 <option th:each="r : ${rewardOptions}" th:value="${r.code}" th:text="${r.name + '（' + r.pointsCost + ' 點）'}">小爆米花兌換券（50 點）</option>
             </select>
-            <div style="margin-top:12px;">
+            <div class="member-redeem-actions">
                 <button type="submit" class="member-btn">確認兌換</button>
             </div>
         </form>
@@ -54,9 +54,8 @@
         </ul>
     </section>
 
-    <section class="member-card">
+    <section class="member-card member-links-inline">
         <a href="/member">← 回會員專區</a>
-        <span style="margin-left: 12px;"></span>
         <a href="/">回到購票首頁</a>
     </section>
 </main>

@@ -58,6 +58,38 @@
             margin-top: 0;
             box-sizing: border-box;
         }
+        .is-hidden { display: none; }
+        .todo-textarea {
+            width: 98%;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: 8px;
+            color: #fff;
+            padding: 12px;
+            font-family: inherit;
+            font-size: 14px;
+            resize: vertical;
+            line-height: 1.6;
+        }
+        .todo-edit-actions {
+            margin-top: 12px;
+            display: flex;
+            gap: 10px;
+        }
+        .btn-muted { background: #666; }
+        .table-empty {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+        }
+        .quick-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+        .form-reset { margin: 0; }
         .status-open { color: #63e6be; font-weight: 500; }
         .status-low { color: #ffd166; font-weight: 500; }
         .status-critical { color: #ff6b6b; font-weight: 500; }
@@ -83,11 +115,11 @@
                 <li th:each="todo : ${todoItems}" th:text="${todo}">08:30 — 影廳巡檢與音響測試</li>
             </ul>
         </div>
-        <div id="todo-edit" style="display: none;">
-            <textarea style="width: 98%; height: 120px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); border-radius: 8px; color: #fff; padding: 12px; font-family: inherit; font-size: 14px; resize: vertical; line-height: 1.6;"></textarea>
-            <div style="margin-top: 12px; display: flex; gap: 10px;">
+        <div id="todo-edit" class="is-hidden">
+            <textarea class="todo-textarea"></textarea>
+            <div class="todo-edit-actions">
                 <button id="save-todo-btn">儲存</button>
-                <button id="cancel-todo-btn" style="background: #666;">取消</button>
+                <button id="cancel-todo-btn" class="btn-muted">取消</button>
             </div>
         </div>
     </section>
@@ -118,7 +150,7 @@
             </tbody>
             <tbody th:if="${showtimeSummaries == null or showtimeSummaries.isEmpty()}">
             <tr>
-                <td colspan="4" style="text-align: center; padding: 20px; color: #999;">目前沒有場次資料</td>
+                <td colspan="4" class="table-empty">目前沒有場次資料</td>
             </tr>
             </tbody>
         </table>
@@ -126,21 +158,21 @@
     
     <section>
         <h2>快速操作</h2>
-        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px;">
+        <div class="quick-actions">
             <a class="btn-link" href="/employee/checklist">更新影廳檢查表</a>
             <a class="btn-link" href="/employee/maintenance">提交維修申請</a>
         </div>
     </section>
     
     <div class="bottom-actions">
-        <form method="post" action="/employee/logout" style="margin: 0;">
+        <form method="post" action="/employee/logout" class="form-reset">
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <button type="submit">登出員工帳號</button>
         </form>
         <a class="btn-link" href="/">返回首頁</a>
     </div>
     
-    <form id="employee-auto-logout" method="post" action="/employee/logout" style="display: none;">
+    <form id="employee-auto-logout" method="post" action="/employee/logout" hidden>
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
     </form>
     <input type="hidden" id="employee-csrf-token" th:value="${_csrf.token}">

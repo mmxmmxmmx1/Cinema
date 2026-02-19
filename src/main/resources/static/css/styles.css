@@ -31,6 +31,20 @@ html {
   --z-floating-panel: 1110;
   --z-auth-widget: 1110;
   --z-modal-backdrop: 1200;
+  --surface-1: #0f1428;
+  --surface-2: #151c33;
+  --surface-3: #1f2946;
+  --text-main: #f3f7ff;
+  --text-subtle: #b6c2e0;
+  --accent: #5d8ef3;
+  --accent-strong: #6ea0ff;
+  --danger-soft: #ff9a9a;
+  --success-soft: #b8ffd8;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-pill: 999px;
+  --shadow-soft: 0 10px 26px rgba(0, 0, 0, 0.28);
+  --shadow-hover: 0 18px 36px rgba(0, 0, 0, 0.4);
 }
 
 /* ========== Hero 頂部區塊（背景延伸到底） ========== */
@@ -369,6 +383,64 @@ html {
   font-size: 1.2rem;
 }
 
+.state-message {
+  border-radius: var(--radius-sm);
+  padding: 0.8rem 0.95rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.state-message + .state-message {
+  margin-top: 0.5rem;
+}
+
+.state-message-error {
+  color: #ffd4d4;
+  border: 1px solid rgba(255, 111, 111, 0.45);
+  background: rgba(122, 31, 31, 0.32);
+}
+
+.state-message-success {
+  color: var(--success-soft);
+  border: 1px solid rgba(88, 255, 161, 0.35);
+  background: rgba(24, 110, 72, 0.28);
+}
+
+.error-state-inline-left {
+  padding: 1rem 0;
+  text-align: left;
+}
+
+.order-heading {
+  margin-top: 0;
+}
+
+.list-reset {
+  list-style: none;
+  padding: 0;
+}
+
+.action-row {
+  margin-top: 16px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.checkout-rule-note {
+  margin-top: 12px;
+  color: var(--text-subtle);
+  line-height: 1.6;
+}
+
+.checkout-payment-state {
+  margin-bottom: 0.5rem;
+}
+
+.mt-14 {
+  margin-top: 14px;
+}
+
 /* ========== 應用外殼 ========== */
 .app-shell {
   min-height: 100vh;
@@ -389,16 +461,19 @@ html {
 }
 
 .movie-card {
-  background: #2c2c2c;
-  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(24, 33, 61, 0.98) 0%, rgba(20, 27, 49, 0.98) 100%);
+  border-radius: var(--radius-md);
   overflow: hidden;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  border: 1px solid rgba(157, 190, 255, 0.14);
+  box-shadow: var(--shadow-soft);
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
   cursor: pointer;
 }
 
 .movie-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-hover);
+  border-color: rgba(157, 190, 255, 0.34);
 }
 
 .movie-card img {
@@ -420,7 +495,7 @@ html {
 }
 
 .card-body p {
-  color: #b8b8b8;
+  color: var(--text-subtle);
   font-size: 0.85rem;
   margin: 0 0 1rem 0;
   line-height: 1.5;
@@ -429,17 +504,20 @@ html {
 /* ========== 連結按鈕 ========== */
 .primary-link {
   display: inline-block;
-  padding: 0.6rem 1.2rem;
-  background: #4a90e2;
+  padding: 0.62rem 1.2rem;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
   color: #fff;
   text-decoration: none;
-  border-radius: 6px;
-  transition: background 0.3s ease;
-  font-weight: 500;
+  border-radius: 10px;
+  transition: transform 0.18s ease, filter 0.18s ease, box-shadow 0.18s ease;
+  font-weight: 600;
+  box-shadow: 0 8px 18px rgba(80, 128, 228, 0.32);
 }
 
 .primary-link:hover {
-  background: #357abd;
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 22px rgba(80, 128, 228, 0.4);
 }
 
 .back-link {
@@ -763,6 +841,14 @@ html {
   color: #b9bedb;
   font-size: 0.88rem;
   line-height: 1.45;
+}
+
+.auth-hint-error {
+  color: var(--danger-soft);
+}
+
+.auth-field-help {
+  color: #9fb4ea;
 }
 
 .auth-actions {
