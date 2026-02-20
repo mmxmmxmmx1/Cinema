@@ -73,6 +73,20 @@ find src/test/java -name '*Test.java' -o -name '*IntegrationTest.java'
 mvn test
 ```
 
+### 選配：瀏覽器 E2E（Playwright）
+預設不會啟用，避免每次本機測試都依賴瀏覽器執行環境。
+
+```bash
+mvn test -Dbrowser.e2e=true -Dtest=BrowserAuthE2EPlaywrightTest
+```
+
+### 選配：真 MySQL 整合測試（Testcontainers）
+需要本機可用 Docker。預設不啟用。
+
+```bash
+mvn test -Dmysql.it=true -Dtest=RealMySqlContainerIntegrationTest
+```
+
 ## Demo 帳號與資料庫操作 (MySQL)
 
 ### 環境變數 (建議)
