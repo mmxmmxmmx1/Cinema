@@ -29,11 +29,15 @@ public class MovieService {
     private static final LocalTime BOOKING_WARNING_TIME = LocalTime.of(22, 40);
     private static final LocalTime BOOKING_CLOSE_TIME = LocalTime.of(22, 45);
     private static final LocalTime OPERATIONAL_DAY_START = LocalTime.of(5, 0);
+    private static final String DEFAULT_LOCATION_CODE = "taipei-main";
+    private static final String DEFAULT_LOCATION_NAME = "台北信義館";
 
     private final Map<String, Movie> fallbackCatalog;
+    private final Map<String, CinemaLocationItem> fallbackLocations;
     private JdbcTemplate jdbcTemplate;
 
     public MovieService() {
+        this.fallbackLocations = defaultLocations();
         List<Movie> seeds = List.of(
                 createMovie(
                         "mv-01",
@@ -184,6 +188,166 @@ public class MovieService {
                 .toList();
     }
 
+    public List<CinemaLocationItem> listCinemaLocations() {
+        List<CinemaLocationItem> fromDb = loadLocationsFromDatabase();
+        if (!fromDb.isEmpty()) {
+            return fromDb;
+        }
+        return fallbackLocations.values().stream()
+                .sorted(Comparator.comparing(CinemaLocationItem::sortOrder).thenComparing(CinemaLocationItem::code))
+                .toList();
+    }
+
+    public List<MovieAdminItem> listMovieAdminItems() {
+        List<MovieAdminItem> fromDb = loadMovieAdminItemsFromDatabase();
+        if (!fromDb.isEmpty()) {
+            return fromDb;
+        }
+        return fallbackCatalog.values().stream()
+                .map(movie -> new MovieAdminItem(
+                        movie.getId(),
+                        movie.getTitle(),
+                        movie.getSubtitle(),
+                        movie.getPosterUrl(),
+                        movie.getCarouselImageUrl(),
+                        movie.getDescription(),
+                        true,
+                        0))
+                .sorted(Comparator.comparing(MovieAdminItem::id))
+                .toList();
+    }
+
+    public Optional<MovieAdminItem> getMovieAdminItem(String movieId) {
+        if (movieId == null || movieId.isBlank()) {
+            return Optional.empty();
+        }
+        String safeMovieId = movieId.trim();
+        return listMovieAdminItems().stream()
+                .filter(item -> safeMovieId.equals(item.id()))
+                .findFirst();
+    }
+
+    @Transactional
+    public void saveMovieCatalog(
+            String movieId,
+            String title,
+            String subtitle,
+            String posterUrl,
+            String carouselImageUrl,
+            String description,
+            int sortOrder,
+            boolean enabled,
+            String operator) {
+        String safeMovieId = normalizeId(movieId, "movieId");
+        String safeTitle = normalizeMovieTitle(title);
+        String safeSubtitle = normalizeOptional(subtitle, 120);
+        String safePosterUrl = normalizePosterUrl(posterUrl);
+        String safeCarouselImageUrl = normalizePosterUrl(carouselImageUrl);
+        String safeDescription = normalizeOptional(description, 1000);
+        int safeSortOrder = Math.max(0, Math.min(10_000, sortOrder));
+        String safeOperator = operator == null || operator.isBlank() ? "unknown" : operator.trim();
+
+        boolean updated = false;
+        boolean useFallback = jdbcTemplate == null;
+        if (jdbcTemplate != null) {
+            try {
+                jdbcTemplate.update(
+                        "INSERT INTO movie_catalog (movie_id, title, subtitle, poster_url, carousel_image_url, description, enabled, sort_order) " +
+                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?) " +
+                                "ON DUPLICATE KEY UPDATE " +
+                                "title = VALUES(title), subtitle = VALUES(subtitle), poster_url = VALUES(poster_url), " +
+                                "carousel_image_url = VALUES(carousel_image_url), description = VALUES(description), " +
+                                "enabled = VALUES(enabled), sort_order = VALUES(sort_order)",
+                        safeMovieId,
+                        safeTitle,
+                        safeSubtitle,
+                        safePosterUrl,
+                        safeCarouselImageUrl,
+                        safeDescription,
+                        enabled ? 1 : 0,
+                        safeSortOrder);
+                updated = true;
+            } catch (DataAccessException ex) {
+                useFallback = true;
+            }
+        }
+
+        if (useFallback) {
+            Movie current = fallbackCatalog.get(safeMovieId);
+            if (!enabled) {
+                fallbackCatalog.remove(safeMovieId);
+                updated = true;
+            } else {
+                List<Showtime> showtimes = current != null
+                        ? current.getShowtimes()
+                        : showtimes(safeMovieId, 120, "09:30", "14:00", "18:30");
+                fallbackCatalog.put(
+                        safeMovieId,
+                        new Movie(
+                                safeMovieId,
+                                safeTitle,
+                                safeSubtitle,
+                                safePosterUrl,
+                                safeCarouselImageUrl,
+                                safeDescription,
+                                showtimes));
+                updated = true;
+            }
+        }
+
+        if (!updated) {
+            throw new IllegalStateException("電影資料儲存失敗。");
+        }
+
+        appendAuditLog(
+                safeOperator,
+                "MOVIE_CATALOG_SAVE",
+                safeMovieId,
+                "enabled=" + (enabled ? 1 : 0) + ",sortOrder=" + safeSortOrder);
+    }
+
+    @Transactional
+    public void setMovieEnabled(String movieId, boolean enabled, String operator) {
+        String safeMovieId = normalizeId(movieId, "movieId");
+        String safeOperator = operator == null || operator.isBlank() ? "unknown" : operator.trim();
+        boolean updated = false;
+
+        if (jdbcTemplate != null) {
+            try {
+                int count = jdbcTemplate.update(
+                        "UPDATE movie_catalog SET enabled = ? WHERE movie_id = ?",
+                        enabled ? 1 : 0,
+                        safeMovieId);
+                updated = count > 0;
+            } catch (DataAccessException ex) {
+                updated = false;
+            }
+        }
+
+        if (!updated) {
+            if (enabled) {
+                Movie movie = fallbackCatalog.get(safeMovieId);
+                if (movie == null) {
+                    throw new IllegalArgumentException("找不到電影：" + safeMovieId);
+                }
+                fallbackCatalog.put(safeMovieId, movie);
+                updated = true;
+            } else {
+                updated = fallbackCatalog.remove(safeMovieId) != null;
+            }
+        }
+
+        if (!updated) {
+            throw new IllegalArgumentException("找不到電影：" + safeMovieId);
+        }
+
+        appendAuditLog(
+                safeOperator,
+                "MOVIE_CATALOG_TOGGLE",
+                safeMovieId,
+                "enabled=" + (enabled ? 1 : 0));
+    }
+
     @Transactional
     public void saveShowtimeOverride(
             String movieId,
@@ -191,6 +355,18 @@ public class MovieService {
             String startTime,
             int durationMinutes,
             String auditorium,
+            String operator) {
+        saveShowtimeOverride(movieId, showtimeId, startTime, durationMinutes, auditorium, DEFAULT_LOCATION_CODE, operator);
+    }
+
+    @Transactional
+    public void saveShowtimeOverride(
+            String movieId,
+            String showtimeId,
+            String startTime,
+            int durationMinutes,
+            String auditorium,
+            String locationCode,
             String operator) {
         String safeMovieId = normalizeId(movieId, "movieId");
         String safeShowtimeId = normalizeId(showtimeId, "showtimeId");
@@ -200,20 +376,37 @@ public class MovieService {
         String safeStartTime = normalizeStartTime(startTime);
         int safeDuration = Math.max(30, Math.min(400, durationMinutes));
         String safeAuditorium = normalizeAuditorium(auditorium);
+        String safeLocationCode = normalizeLocationCode(locationCode);
+        String safeLocationName = resolveLocationName(safeLocationCode, null);
         String safeOperator = operator == null || operator.isBlank() ? "unknown" : operator.trim();
 
         if (jdbcTemplate == null) {
             throw new IllegalStateException("資料庫尚未就緒，無法寫入場次。");
         }
-        int updated = jdbcTemplate.update(
-                "UPDATE showtime_overrides SET start_time = ?, duration_minutes = ?, auditorium = ?, enabled = 1, updated_by = ? " +
-                        "WHERE movie_id = ? AND showtime_id = ?",
-                safeStartTime, safeDuration, safeAuditorium, safeOperator, safeMovieId, safeShowtimeId);
+        boolean hasLocationColumns = supportsOverrideLocationColumns();
+        int updated = hasLocationColumns
+                ? jdbcTemplate.update(
+                        "UPDATE showtime_overrides SET start_time = ?, duration_minutes = ?, auditorium = ?, location_code = ?, location_name = ?, enabled = 1, updated_by = ? " +
+                                "WHERE movie_id = ? AND showtime_id = ?",
+                        safeStartTime, safeDuration, safeAuditorium, safeLocationCode, safeLocationName, safeOperator,
+                        safeMovieId, safeShowtimeId)
+                : jdbcTemplate.update(
+                        "UPDATE showtime_overrides SET start_time = ?, duration_minutes = ?, auditorium = ?, enabled = 1, updated_by = ? " +
+                                "WHERE movie_id = ? AND showtime_id = ?",
+                        safeStartTime, safeDuration, safeAuditorium, safeOperator, safeMovieId, safeShowtimeId);
         if (updated == 0) {
-            jdbcTemplate.update(
-                    "INSERT INTO showtime_overrides (movie_id, showtime_id, start_time, duration_minutes, auditorium, enabled, updated_by) " +
-                            "VALUES (?, ?, ?, ?, ?, 1, ?)",
-                    safeMovieId, safeShowtimeId, safeStartTime, safeDuration, safeAuditorium, safeOperator);
+            if (hasLocationColumns) {
+                jdbcTemplate.update(
+                        "INSERT INTO showtime_overrides (movie_id, showtime_id, start_time, duration_minutes, auditorium, location_code, location_name, enabled, updated_by) " +
+                                "VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)",
+                        safeMovieId, safeShowtimeId, safeStartTime, safeDuration, safeAuditorium, safeLocationCode,
+                        safeLocationName, safeOperator);
+            } else {
+                jdbcTemplate.update(
+                        "INSERT INTO showtime_overrides (movie_id, showtime_id, start_time, duration_minutes, auditorium, enabled, updated_by) " +
+                                "VALUES (?, ?, ?, ?, ?, 1, ?)",
+                        safeMovieId, safeShowtimeId, safeStartTime, safeDuration, safeAuditorium, safeOperator);
+            }
         }
     }
 
@@ -237,9 +430,7 @@ public class MovieService {
                 return Map.of();
             }
 
-            List<Map<String, Object>> showtimeRows = jdbcTemplate.queryForList(
-                    "SELECT movie_id, showtime_id, start_time, duration_minutes, auditorium, sort_order " +
-                            "FROM movie_showtimes WHERE enabled = 1 ORDER BY movie_id ASC, sort_order ASC, showtime_id ASC");
+            List<Map<String, Object>> showtimeRows = loadMovieShowtimeRows();
 
             Map<String, List<Showtime>> showtimesByMovie = new HashMap<>();
             for (Map<String, Object> row : showtimeRows) {
@@ -248,8 +439,14 @@ public class MovieService {
                 String startTime = String.valueOf(row.get("start_time"));
                 int duration = ((Number) row.get("duration_minutes")).intValue();
                 String auditorium = String.valueOf(row.get("auditorium"));
+                String locationCode = row.get("location_code") == null || String.valueOf(row.get("location_code")).isBlank()
+                        ? DEFAULT_LOCATION_CODE
+                        : String.valueOf(row.get("location_code"));
+                String locationName = resolveLocationName(
+                        locationCode,
+                        row.get("location_name") == null ? null : String.valueOf(row.get("location_name")));
                 showtimesByMovie.computeIfAbsent(movieId, ignored -> new ArrayList<>())
-                        .add(new Showtime(showtimeId, startTime, duration, auditorium));
+                        .add(new Showtime(showtimeId, startTime, duration, auditorium, locationCode, locationName));
             }
 
             Map<String, Movie> mapped = new LinkedHashMap<>();
@@ -288,10 +485,17 @@ public class MovieService {
                 "UPDATE showtime_overrides SET enabled = 0, updated_by = ? WHERE movie_id = ? AND showtime_id = ?",
                 safeOperator, safeMovieId, safeShowtimeId);
         if (updated == 0) {
-            jdbcTemplate.update(
-                    "INSERT INTO showtime_overrides (movie_id, showtime_id, start_time, duration_minutes, auditorium, enabled, updated_by) " +
-                            "VALUES (?, ?, '00:00', 120, '未設定', 0, ?)",
-                    safeMovieId, safeShowtimeId, safeOperator);
+            if (supportsOverrideLocationColumns()) {
+                jdbcTemplate.update(
+                        "INSERT INTO showtime_overrides (movie_id, showtime_id, start_time, duration_minutes, auditorium, location_code, location_name, enabled, updated_by) " +
+                                "VALUES (?, ?, '00:00', 120, '未設定', ?, ?, 0, ?)",
+                        safeMovieId, safeShowtimeId, DEFAULT_LOCATION_CODE, DEFAULT_LOCATION_NAME, safeOperator);
+            } else {
+                jdbcTemplate.update(
+                        "INSERT INTO showtime_overrides (movie_id, showtime_id, start_time, duration_minutes, auditorium, enabled, updated_by) " +
+                                "VALUES (?, ?, '00:00', 120, '未設定', 0, ?)",
+                        safeMovieId, safeShowtimeId, safeOperator);
+            }
         }
     }
 
@@ -503,7 +707,24 @@ public class MovieService {
                     map.remove(showtimeId);
                     continue;
                 }
-                map.put(showtimeId, new Showtime(showtimeId, row.startTime(), row.durationMinutes(), row.auditorium()));
+                Showtime base = map.get(showtimeId);
+                String locationCode = row.locationCode() == null || row.locationCode().isBlank()
+                        ? (base == null ? DEFAULT_LOCATION_CODE : base.getLocationCode())
+                        : row.locationCode();
+                String locationName = resolveLocationName(
+                        locationCode,
+                        row.locationName() == null || row.locationName().isBlank()
+                                ? (base == null ? null : base.getLocationName())
+                                : row.locationName());
+                map.put(
+                        showtimeId,
+                        new Showtime(
+                                showtimeId,
+                                row.startTime(),
+                                row.durationMinutes(),
+                                row.auditorium(),
+                                locationCode,
+                                locationName));
             }
         }
 
@@ -535,8 +756,11 @@ public class MovieService {
         }
 
         String placeholders = String.join(",", Collections.nCopies(ids.size(), "?"));
-        String sql = "SELECT movie_id, showtime_id, start_time, duration_minutes, auditorium, enabled " +
-                "FROM showtime_overrides WHERE movie_id IN (" + placeholders + ")";
+        String sql = supportsOverrideLocationColumns()
+                ? "SELECT movie_id, showtime_id, start_time, duration_minutes, auditorium, location_code, location_name, enabled " +
+                        "FROM showtime_overrides WHERE movie_id IN (" + placeholders + ")"
+                : "SELECT movie_id, showtime_id, start_time, duration_minutes, auditorium, enabled " +
+                        "FROM showtime_overrides WHERE movie_id IN (" + placeholders + ")";
         try {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, ids.toArray());
             for (Map<String, Object> row : rows) {
@@ -546,6 +770,8 @@ public class MovieService {
                         String.valueOf(row.get("start_time")),
                         ((Number) row.get("duration_minutes")).intValue(),
                         String.valueOf(row.get("auditorium")),
+                        row.get("location_code") == null ? null : String.valueOf(row.get("location_code")),
+                        row.get("location_name") == null ? null : String.valueOf(row.get("location_name")),
                         row.get("enabled") != null && ((Number) row.get("enabled")).intValue() != 0);
                 overridesByMovie.computeIfAbsent(movieId, ignored -> new ArrayList<>()).add(override);
             }
@@ -555,6 +781,135 @@ public class MovieService {
         return overridesByMovie;
     }
 
+    private List<Map<String, Object>> loadMovieShowtimeRows() {
+        try {
+            return jdbcTemplate.queryForList(
+                    "SELECT movie_id, showtime_id, start_time, duration_minutes, auditorium, location_code, location_name, sort_order " +
+                            "FROM movie_showtimes WHERE enabled = 1 ORDER BY movie_id ASC, sort_order ASC, showtime_id ASC");
+        } catch (DataAccessException ex) {
+            return jdbcTemplate.queryForList(
+                    "SELECT movie_id, showtime_id, start_time, duration_minutes, auditorium, sort_order " +
+                            "FROM movie_showtimes WHERE enabled = 1 ORDER BY movie_id ASC, sort_order ASC, showtime_id ASC");
+        }
+    }
+
+    private List<CinemaLocationItem> loadLocationsFromDatabase() {
+        if (jdbcTemplate == null) {
+            return List.of();
+        }
+        try {
+            return jdbcTemplate.query(
+                    "SELECT location_code, location_name, city, sort_order " +
+                            "FROM cinema_locations WHERE enabled = 1 ORDER BY sort_order ASC, location_code ASC",
+                    (rs, rowNum) -> new CinemaLocationItem(
+                            rs.getString("location_code"),
+                            rs.getString("location_name"),
+                            rs.getString("city"),
+                            rs.getInt("sort_order")));
+        } catch (DataAccessException ex) {
+            return List.of();
+        }
+    }
+
+    private List<MovieAdminItem> loadMovieAdminItemsFromDatabase() {
+        if (jdbcTemplate == null) {
+            return List.of();
+        }
+        try {
+            return jdbcTemplate.query(
+                    "SELECT movie_id, title, subtitle, poster_url, carousel_image_url, description, enabled, sort_order " +
+                            "FROM movie_catalog ORDER BY sort_order ASC, movie_id ASC",
+                    (rs, rowNum) -> {
+                        String posterUrl = rs.getString("poster_url");
+                        String carouselImageUrl = rs.getString("carousel_image_url");
+                        if (carouselImageUrl == null || carouselImageUrl.isBlank()) {
+                            carouselImageUrl = posterUrl;
+                        }
+                        return new MovieAdminItem(
+                                rs.getString("movie_id"),
+                                rs.getString("title"),
+                                rs.getString("subtitle"),
+                                posterUrl,
+                                carouselImageUrl,
+                                rs.getString("description"),
+                                rs.getInt("enabled") != 0,
+                                rs.getInt("sort_order"));
+                    });
+        } catch (DataAccessException ex) {
+            return List.of();
+        }
+    }
+
+    private Map<String, CinemaLocationItem> defaultLocations() {
+        LinkedHashMap<String, CinemaLocationItem> locations = new LinkedHashMap<>();
+        locations.put(
+                DEFAULT_LOCATION_CODE,
+                new CinemaLocationItem(DEFAULT_LOCATION_CODE, DEFAULT_LOCATION_NAME, "台北", 10));
+        locations.put(
+                "taichung-park",
+                new CinemaLocationItem("taichung-park", "台中站前館", "台中", 20));
+        locations.put(
+                "kaohsiung-bay",
+                new CinemaLocationItem("kaohsiung-bay", "高雄港灣館", "高雄", 30));
+        return locations;
+    }
+
+    private String resolveLocationName(String locationCode, String candidate) {
+        if (candidate != null && !candidate.isBlank()) {
+            return candidate.trim();
+        }
+        CinemaLocationItem fallback = fallbackLocations.get(locationCode);
+        if (fallback != null) {
+            return fallback.name();
+        }
+        List<CinemaLocationItem> locations = loadLocationsFromDatabase();
+        for (CinemaLocationItem item : locations) {
+            if (item.code().equals(locationCode)) {
+                return item.name();
+            }
+        }
+        return DEFAULT_LOCATION_NAME;
+    }
+
+    private boolean supportsOverrideLocationColumns() {
+        return supportsColumn("showtime_overrides", "location_code")
+                && supportsColumn("showtime_overrides", "location_name");
+    }
+
+    private boolean supportsColumn(String tableName, String columnName) {
+        if (jdbcTemplate == null) {
+            return false;
+        }
+        try {
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM information_schema.columns " +
+                            "WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?",
+                    Integer.class,
+                    tableName,
+                    columnName);
+            return count != null && count > 0;
+        } catch (DataAccessException ex) {
+            return false;
+        }
+    }
+
+    private void appendAuditLog(String actorId, String action, String targetId, String detail) {
+        if (jdbcTemplate == null) {
+            return;
+        }
+        try {
+            jdbcTemplate.update(
+                    "INSERT INTO audit_logs (actor_type, actor_id, action, target_type, target_id, result, detail) " +
+                            "VALUES ('EMPLOYEE', ?, ?, 'MOVIE', ?, 'SUCCESS', ?)",
+                    actorId,
+                    action,
+                    targetId,
+                    detail);
+        } catch (DataAccessException ignored) {
+            // Ignore when audit table is unavailable in lightweight schemas.
+        }
+    }
+
     private Movie createMovie(String id, String title, String subtitle, String posterUrl, String carouselImageUrl,
             String description, List<Showtime> showtimes) {
         return new Movie(id, title, subtitle, posterUrl, carouselImageUrl, description, showtimes);
@@ -562,12 +917,20 @@ public class MovieService {
 
     private List<Showtime> showtimes(String movieId, int durationMinutes, String... startTimes) {
         List<Showtime> entries = new ArrayList<>();
+        List<CinemaLocationItem> locations = fallbackLocations.values().stream()
+                .sorted(Comparator.comparing(CinemaLocationItem::sortOrder).thenComparing(CinemaLocationItem::code))
+                .toList();
         for (int i = 0; i < startTimes.length; i++) {
+            CinemaLocationItem location = locations.isEmpty()
+                    ? new CinemaLocationItem(DEFAULT_LOCATION_CODE, DEFAULT_LOCATION_NAME, "台北", 10)
+                    : locations.get(i % locations.size());
             entries.add(new Showtime(
                     movieId + "-st" + (i + 1),
                     startTimes[i],
                     durationMinutes,
-                    (i % 3+1) + "號廳"));
+                    (i % 3 + 1) + "號廳",
+                    location.code(),
+                    location.name()));
         }
         return entries;
     }
@@ -644,6 +1007,32 @@ public class MovieService {
         return safe.length() > 100 ? safe.substring(0, 100) : safe;
     }
 
+    private String normalizeLocationCode(String value) {
+        String safe = value == null ? "" : value.trim();
+        if (safe.isBlank()) {
+            return DEFAULT_LOCATION_CODE;
+        }
+        List<CinemaLocationItem> locations = listCinemaLocations();
+        boolean exists = locations.stream().anyMatch(item -> item.code().equals(safe));
+        if (!exists && !fallbackLocations.containsKey(safe)) {
+            throw new IllegalArgumentException("館別代碼不存在：" + safe);
+        }
+        return safe;
+    }
+
+    private static String normalizeMovieTitle(String value) {
+        String safe = value == null ? "" : value.trim();
+        if (safe.isBlank()) {
+            throw new IllegalArgumentException("電影名稱不可為空。");
+        }
+        return safe.length() > 120 ? safe.substring(0, 120) : safe;
+    }
+
+    private static String normalizeOptional(String value, int maxLength) {
+        String safe = value == null ? "" : value.trim();
+        return safe.length() > maxLength ? safe.substring(0, maxLength) : safe;
+    }
+
     private static String normalizePosterUrl(String value) {
         String safe = value == null ? "" : value.trim();
         if (safe.isBlank()) {
@@ -669,11 +1058,31 @@ public class MovieService {
     public record MovieCatalogItem(String id, String title) {
     }
 
+    public record MovieAdminItem(
+            String id,
+            String title,
+            String subtitle,
+            String posterUrl,
+            String carouselImageUrl,
+            String description,
+            boolean enabled,
+            int sortOrder) {
+    }
+
+    public record CinemaLocationItem(
+            String code,
+            String name,
+            String city,
+            int sortOrder) {
+    }
+
     private record ShowtimeOverrideRow(
             String showtimeId,
             String startTime,
             int durationMinutes,
             String auditorium,
+            String locationCode,
+            String locationName,
             boolean enabled) {
     }
 }

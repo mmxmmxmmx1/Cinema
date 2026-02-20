@@ -4,6 +4,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.example.cinema.config.SecurityConfig;
 import com.example.cinema.dto.AuthStatusResponse;
 import com.example.cinema.dto.MemberBooking;
 import com.example.cinema.dto.MemberRegisterRequest;
@@ -24,6 +25,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -52,22 +54,23 @@ public class MemberApiController {
     }
 
     @GetMapping("/auth/member")
-    public ResponseEntity<AuthStatusResponse> memberAuth(Authentication authentication) {
-        boolean loggedIn = authentication != null
-                && authentication.isAuthenticated()
-                && !(authentication instanceof AnonymousAuthenticationToken);
+    public ResponseEntity<AuthStatusResponse> memberAuth(HttpSession session) {
+        Authentication memberAuthentication = resolveRealmAuthentication(session, SecurityConfig.MEMBER_SECURITY_CONTEXT_KEY);
+        Authentication employeeAuthentication = resolveRealmAuthentication(session, SecurityConfig.EMPLOYEE_SECURITY_CONTEXT_KEY);
 
-        Set<String> authorities = loggedIn
-                ? authentication.getAuthorities().stream().map(GrantedAuthority::getAuthority).collect(java.util.stream.Collectors.toSet())
-                : Set.of();
+        boolean isMember = memberAuthentication != null;
+        boolean isEmployee = employeeAuthentication != null;
 
-        boolean isMember = authorities.contains("ROLE_MEMBER");
-        boolean isEmployee = authorities.contains("ROLE_EMPLOYEE")
-                || authorities.contains("ROLE_IT")
-                || authorities.contains("ROLE_MANAGER")
-                || authorities.contains("ROLE_ADMIN");
+        Set<String> authorities = new HashSet<>();
+        if (isMember) {
+            authorities.addAll(toAuthorityCodes(memberAuthentication));
+        }
+        if (isEmployee) {
+            authorities.addAll(toAuthorityCodes(employeeAuthentication));
+        }
 
-        String username = loggedIn ? authentication.getName() : null;
+        String username = isMember ? memberAuthentication.getName()
+                : (isEmployee ? employeeAuthentication.getName() : null);
         List<String> roles = authorities.stream().sorted().toList();
 
         // Backward compatibility: `authenticated` means "logged in as MEMBER".
@@ -106,17 +109,44 @@ public class MemberApiController {
     }
 
     @GetMapping("/member/summary")
-    public ResponseEntity<MemberSummary> summary(HttpSession session, Authentication authentication) {
-        if (!sessionService.isAuthenticated(session, Realm.MEMBER)) {
+    public ResponseEntity<MemberSummary> summary(HttpSession session) {
+        Authentication memberAuthentication = resolveRealmAuthentication(session, SecurityConfig.MEMBER_SECURITY_CONTEXT_KEY);
+        if (!sessionService.isAuthenticated(session, Realm.MEMBER) || memberAuthentication == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        String username = authentication == null ? null : authentication.getName();
+        String username = memberAuthentication.getName();
         int points = memberLoyaltyService.currentPoints(username);
         List<MemberBooking> bookings = memberOrderService.listUpcomingBookings(username, 5).stream()
                 .map(b -> new MemberBooking(b.movieTitle(), b.showStartLabel(), b.auditorium()))
                 .toList();
         MemberSummary summary = new MemberSummary(points, bookings);
         return ResponseEntity.ok(summary);
+    }
+
+    private Authentication resolveRealmAuthentication(HttpSession session, String contextKey) {
+        if (session == null || contextKey == null || contextKey.isBlank()) {
+            return null;
+        }
+        Object securityContext = session.getAttribute(contextKey);
+        if (!(securityContext instanceof SecurityContext context)) {
+            return null;
+        }
+        Authentication authentication = context.getAuthentication();
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken) {
+            return null;
+        }
+        return authentication;
+    }
+
+    private Set<String> toAuthorityCodes(Authentication authentication) {
+        if (authentication == null || authentication.getAuthorities() == null) {
+            return Set.of();
+        }
+        return authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(java.util.stream.Collectors.toSet());
     }
 }

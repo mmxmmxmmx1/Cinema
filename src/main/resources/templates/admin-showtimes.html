@@ -65,6 +65,12 @@
                     <input id="auditorium" name="auditorium" maxlength="100" placeholder="1號廳">
                 </div>
                 <div>
+                    <label for="locationCode">館別</label>
+                    <select id="locationCode" name="locationCode">
+                        <option th:each="location : ${locations}" th:value="${location.code}" th:text="${location.name}">台北信義館</option>
+                    </select>
+                </div>
+                <div>
                     <button type="submit">儲存場次</button>
                 </div>
             </div>
@@ -81,6 +87,7 @@
                 <th>時間</th>
                 <th>片長</th>
                 <th>影廳</th>
+                <th>館別</th>
                 <th>動作</th>
             </tr>
             </thead>
@@ -90,6 +97,7 @@
                 <td th:text="${s.startTime}">08:50</td>
                 <td th:text="${s.durationMinutes + ' 分'}">120 分</td>
                 <td th:text="${s.auditorium}">1號廳</td>
+                <td th:text="${s.locationName}">台北信義館</td>
                 <td>
                     <form method="post" action="/employee/admin/showtimes/disable">
                         <input type="hidden" th:name="${_csrf != null ? _csrf.parameterName : '_csrf'}" th:value="${_csrf != null ? _csrf.token : ''}">

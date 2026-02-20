@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.Authentication;
@@ -23,6 +24,8 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.InvalidCsrfTokenException;
 import org.springframework.security.web.csrf.MissingCsrfTokenException;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextRepository;
 
 import com.example.cinema.dao.UserDao;
 import com.example.cinema.model.User;
@@ -40,6 +43,9 @@ import org.springframework.security.web.csrf.CsrfException;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    public static final String MEMBER_SECURITY_CONTEXT_KEY = "SPRING_SECURITY_CONTEXT_MEMBER";
+    public static final String EMPLOYEE_SECURITY_CONTEXT_KEY = "SPRING_SECURITY_CONTEXT_EMPLOYEE";
 
     private static final String STANDARD_CSP = String.join("; ",
             "default-src 'self'",
@@ -121,9 +127,26 @@ public class SecurityConfig {
         return "Lax";
     }
 
+    @Bean("memberSecurityContextRepository")
+    public SecurityContextRepository memberSecurityContextRepository() {
+        HttpSessionSecurityContextRepository repo = new HttpSessionSecurityContextRepository();
+        repo.setSpringSecurityContextKey(MEMBER_SECURITY_CONTEXT_KEY);
+        return repo;
+    }
+
+    @Bean("employeeSecurityContextRepository")
+    public SecurityContextRepository employeeSecurityContextRepository() {
+        HttpSessionSecurityContextRepository repo = new HttpSessionSecurityContextRepository();
+        repo.setSpringSecurityContextKey(EMPLOYEE_SECURITY_CONTEXT_KEY);
+        return repo;
+    }
+
     @Bean
     @Order(1)
-    public SecurityFilterChain employeeSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain employeeSecurityFilterChain(
+            HttpSecurity http,
+            @Qualifier("employeeSecurityContextRepository") SecurityContextRepository employeeSecurityContextRepository)
+            throws Exception {
         http.securityMatcher("/employee/**")
                 .userDetailsService(username -> {
                     // ⚠️ 重要：在驗證密碼之前先檢查帳號是否被鎖定
@@ -156,6 +179,8 @@ public class SecurityConfig {
                         .requestMatchers("/employee/admin/**").hasRole("ADMIN")
                         .requestMatchers("/employee/**").hasAnyRole("EMPLOYEE", "IT", "MANAGER", "ADMIN")
                         .anyRequest().authenticated())
+                .securityContext(context -> context
+                        .securityContextRepository(employeeSecurityContextRepository))
 
                 // Keep CSRF enabled for employee pages.
                 // Only ignore non-sensitive heartbeat endpoints.
@@ -220,12 +245,15 @@ public class SecurityConfig {
                         }))
                 .logout(logout -> logout
                         .logoutUrl("/employee/logout")
+                        .invalidateHttpSession(false)
                         .logoutSuccessHandler((request, response, authentication) -> {
                             var session = request.getSession(false);
                             if (session != null) {
+                                session.removeAttribute(EMPLOYEE_SECURITY_CONTEXT_KEY);
                                 sessionService.clearAuthentication(session, SessionService.Realm.EMPLOYEE);
                                 sessionService.resetAttempts(session, SessionService.Realm.EMPLOYEE);
                             }
+                            SecurityContextHolder.clearContext();
                             response.sendRedirect("/employee/login");
                         })
                         .permitAll());
@@ -234,7 +262,10 @@ public class SecurityConfig {
 
     @Bean
     @Order(2)
-    public SecurityFilterChain memberSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain memberSecurityFilterChain(
+            HttpSecurity http,
+            @Qualifier("memberSecurityContextRepository") SecurityContextRepository memberSecurityContextRepository)
+            throws Exception {
         http.securityMatcher("/member/**")
                 .userDetailsService(username -> {
                     // ⚠️ 重要：在驗證密碼之前先檢查帳號是否被鎖定
@@ -263,6 +294,8 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers("/member/**").hasRole("MEMBER")
                         .anyRequest().authenticated())
+                .securityContext(context -> context
+                        .securityContextRepository(memberSecurityContextRepository))
                 .exceptionHandling(ex -> ex.accessDeniedHandler((request, response, accessDeniedException) -> {
                     if (request.getRequestURI() != null && request.getRequestURI().startsWith("/member/api/")) {
                         String message;
@@ -347,12 +380,15 @@ public class SecurityConfig {
                         }))
                 .logout(logout -> logout
                         .logoutUrl("/member/logout")
+                        .invalidateHttpSession(false)
                         .logoutSuccessHandler((request, response, authentication) -> {
                             var session = request.getSession(false);
                             if (session != null) {
+                                session.removeAttribute(MEMBER_SECURITY_CONTEXT_KEY);
                                 sessionService.clearAuthentication(session, SessionService.Realm.MEMBER);
                                 sessionService.resetAttempts(session, SessionService.Realm.MEMBER);
                             }
+                            SecurityContextHolder.clearContext();
                             response.sendRedirect("/member/login");
                         })
                         .permitAll());
