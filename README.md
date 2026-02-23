@@ -34,6 +34,7 @@ Flyway Migration
 - 資料治理：`docs/data-governance.md`
 - 圖片素材規範：`docs/image-assets-policy.md`
 - 專案交接清單：`docs/handover-checklist.md`
+- 功能完成度矩陣：`docs/feature-matrix.md`
 
 ## 1. 環境需求
 
@@ -58,6 +59,10 @@ mvn spring-boot:run
 API 路徑：
 - 既有：`/api/**`
 - 版本化別名：`/api/v1/**`（兩者目前行為相同）
+
+前端資源說明：
+- Vue 以本機靜態檔載入：`/js/vendor/vue.global.prod.js`
+- 不依賴外部 CDN（避免因網路/封鎖造成首頁黑畫面）
 
 ## 3. 資料庫設定
 
