@@ -1,6 +1,9 @@
 package com.example.cinema.integration;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.net.URI;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -110,8 +113,38 @@ class BrowserAuthE2EPlaywrightTest {
         assertTrue(page.url().contains("/employee/login"));
     }
 
+    @Test
+    @DisplayName("未登入直接開啟 checkout 深連結應導回首頁")
+    void anonymousCheckoutDeepLinkShouldRedirectHome() {
+        page.navigate(baseUrl("/checkout/mv-01/showtimes/mv-01-st1"));
+        waitForPath("/");
+        assertEquals("/", currentPath());
+    }
+
+    @Test
+    @DisplayName("未登入直接開啟 orders 深連結應導回首頁")
+    void anonymousOrdersDeepLinkShouldRedirectHome() {
+        page.navigate(baseUrl("/orders/123"));
+        waitForPath("/");
+        assertEquals("/", currentPath());
+    }
+
     private String baseUrl(String path) {
         return "http://127.0.0.1:" + port + path;
+    }
+
+    private String currentPath() {
+        return URI.create(page.url()).getPath();
+    }
+
+    private void waitForPath(String expectedPath) {
+        long deadline = System.currentTimeMillis() + 10_000;
+        while (System.currentTimeMillis() < deadline) {
+            if (expectedPath.equals(currentPath())) {
+                return;
+            }
+            page.waitForTimeout(100);
+        }
     }
 
     private void resetAuthSchema() {

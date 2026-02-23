@@ -41,3 +41,6 @@ build/
 
 # Local environment file
 .env
+
+# Playwright browsers cache
+.playwright-browsers/

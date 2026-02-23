@@ -7,6 +7,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -132,11 +133,49 @@ class SecurityAccessIntegrationTest {
     }
 
     @Test
+    @DisplayName("SPA 路徑應套用 SPA CSP（包含 unsafe-eval）")
+    void shouldApplySpaCspOnSpaRoutes() throws Exception {
+        mockMvc.perform(get("/movies/mv-01"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Security-Policy",
+                        Matchers.containsString("script-src 'self' 'unsafe-eval'")));
+    }
+
+    @Test
+    @DisplayName("API 路徑應套用標準 CSP（不包含 unsafe-eval）")
+    void shouldApplyStandardCspOnApiRoutes() throws Exception {
+        mockMvc.perform(get("/api/v1/health"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Security-Policy", Matchers.containsString("script-src 'self'")))
+                .andExpect(header().string("Content-Security-Policy", Matchers.not(Matchers.containsString("'unsafe-eval'"))));
+    }
+
+    @Test
     @DisplayName("v1 API 別名應可匿名存取健康檢查")
     void shouldAllowAnonymousAccessToV1HealthApi() throws Exception {
         mockMvc.perform(get("/api/v1/health"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("UP"));
+    }
+
+    @Test
+    @DisplayName("未登入直接開啟 checkout 深連結應回傳 SPA 入口頁")
+    void shouldServeSpaEntryForAnonymousCheckoutDeepLink() throws Exception {
+        mockMvc.perform(get("/checkout/mv-01/showtimes/mv-01-st1"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", Matchers.containsString("text/html")))
+                .andExpect(content().string(Matchers.containsString("<div id=\"root\"></div>")))
+                .andExpect(content().string(Matchers.containsString("/js/modules/vendor-loader.js")));
+    }
+
+    @Test
+    @DisplayName("未登入直接開啟 orders 深連結應回傳 SPA 入口頁")
+    void shouldServeSpaEntryForAnonymousOrdersDeepLink() throws Exception {
+        mockMvc.perform(get("/orders/123"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", Matchers.containsString("text/html")))
+                .andExpect(content().string(Matchers.containsString("<div id=\"root\"></div>")))
+                .andExpect(content().string(Matchers.containsString("/js/modules/vendor-loader.js")));
     }
 
     @Test

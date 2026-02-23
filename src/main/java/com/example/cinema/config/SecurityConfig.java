@@ -74,6 +74,11 @@ public class SecurityConfig {
             "frame-ancestors 'self'",
             "form-action 'self'");
 
+    private static final String[] SPA_CLIENT_ROUTE_PATTERNS = { "/movies/**", "/checkout/**", "/orders/**" };
+    private static final String[] SPA_CLIENT_ROUTE_PREFIXES = { "/movies/", "/checkout/", "/orders/" };
+    private static final Set<String> SPA_CLIENT_ROUTE_EXACT_PATHS = Set.of("/", "/index.html", "/movies", "/checkout",
+            "/orders");
+
     private final UserDao userDao;
     private final SessionService sessionService;
     private final LoginAttemptService loginAttemptService;
@@ -239,6 +244,7 @@ public class SecurityConfig {
                             loginAttemptService.registerSuccess(SessionService.Realm.EMPLOYEE, clientIp);
                             sessionService.establishSession(session, SessionService.Realm.EMPLOYEE);
                             sessionService.resetAttempts(session, SessionService.Realm.EMPLOYEE);
+                            refreshCsrfCookie(request, response);
 
                             String redirectUrl = determineEmployeeRedirectUrl(authentication);
                             response.sendRedirect(redirectUrl);
@@ -374,6 +380,7 @@ public class SecurityConfig {
                             loginAttemptService.registerSuccess(SessionService.Realm.MEMBER, clientIp);
                             sessionService.establishSession(session, SessionService.Realm.MEMBER);
                             sessionService.resetAttempts(session, SessionService.Realm.MEMBER);
+                            refreshCsrfCookie(request, response);
                             handleMemberPostLogin(session, authentication);
                             String safeReturnTo = sanitizeReturnTo(returnTo);
                             response.sendRedirect(safeReturnTo != null ? safeReturnTo : "/member");
@@ -411,7 +418,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/health").permitAll()
                 .requestMatchers("/api/guest/**", "/api/movies/**").permitAll()
                 .requestMatchers("/api/v1/guest/**", "/api/v1/movies/**").permitAll()
-                .requestMatchers("/movies/**").permitAll() // 加這行
+                .requestMatchers(SPA_CLIENT_ROUTE_PATTERNS).permitAll()
                 .anyRequest().authenticated())
                 // Only ignore CSRF for guest APIs used by the SPA without a token.
                 // Keep CSRF enabled elsewhere to avoid widening the attack surface.
@@ -420,7 +427,11 @@ public class SecurityConfig {
                         .ignoringRequestMatchers("/api/guest/**", "/api/v1/guest/**"));
 
         http.headers(headers -> headers
-                .contentSecurityPolicy(csp -> csp.policyDirectives(SPA_CSP))
+                .addHeaderWriter((request, response) -> {
+                    String path = request == null ? null : request.getRequestURI();
+                    String csp = isSpaClientRoute(path) ? SPA_CSP : STANDARD_CSP;
+                    response.setHeader("Content-Security-Policy", csp);
+                })
                 .httpStrictTransportSecurity(hsts -> hsts
                         .includeSubDomains(true)
                         .preload(true)
@@ -436,6 +447,21 @@ public class SecurityConfig {
         // configure Spring's forwarded header support so remoteAddr is the client IP.
         String ip = request.getRemoteAddr();
         return (ip == null || ip.isBlank()) ? "unknown" : ip;
+    }
+
+    private static boolean isSpaClientRoute(String path) {
+        if (path == null) {
+            return false;
+        }
+        if (SPA_CLIENT_ROUTE_EXACT_PATHS.contains(path)) {
+            return true;
+        }
+        for (String prefix : SPA_CLIENT_ROUTE_PREFIXES) {
+            if (path.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String sanitizeReturnTo(String returnTo) {
@@ -557,6 +583,11 @@ public class SecurityConfig {
             userService.mergeGuestWatchlistIntoUser(authentication.getName(), watchlist);
             session.removeAttribute(sessionService.guestWatchlistKey());
         }
+    }
+
+    private void refreshCsrfCookie(HttpServletRequest request, HttpServletResponse response) {
+        CookieCsrfTokenRepository repo = csrfTokenRepository();
+        repo.saveToken(repo.generateToken(request), request, response);
     }
 
     private boolean hasAuthority(java.util.Collection<? extends GrantedAuthority> authorities, String code) {

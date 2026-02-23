@@ -63,6 +63,8 @@ API 路徑：
 前端資源說明：
 - Vue 以本機靜態檔載入：`/js/vendor/vue.global.prod.js`
 - 不依賴外部 CDN（避免因網路/封鎖造成首頁黑畫面）
+- `/movies/**`、`/checkout/**`、`/orders/**` 為 SPA 客戶端路由，後端僅放行入口頁載入
+- 需要會員權限的敏感操作仍在 `/member/**` 與 `/member/api/**` 進行驗證，不因 SPA 路由放行而降低權限控管
 
 ## 3. 資料庫設定
 
@@ -143,6 +145,34 @@ mvn clean test
 測試包含：
 - Service / Controller 單元測試
 - Integration 測試（電影流程與新功能流程）
+- Playwright 瀏覽器 E2E（需明確開啟）
+- 真 MySQL 容器整合測試（需明確開啟）
+
+### 額外測試開關
+
+Playwright 瀏覽器 E2E：
+
+```bash
+PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers \
+mvn -Dbrowser.e2e=true -Dtest=BrowserAuthE2EPlaywrightTest test
+```
+
+真 MySQL（Testcontainers）整合測試：
+
+```bash
+mvn -Dmysql.it=true -Dtest=RealMySqlContainerIntegrationTest test
+```
+
+必要條件：
+- Playwright 首次執行會下載瀏覽器到 `.playwright-browsers/`（已在 `.gitignore` 忽略，不會上傳 git）
+- Linux 若出現缺少動態函式庫警告，可安裝：
+
+```bash
+sudo apt-get update
+sudo apt-get install -y libicu70 libvpx7
+```
+
+- 真 MySQL 整合測試需要可用的 Docker daemon（`/var/run/docker.sock`）
 
 ### 手動驗證腳本（訂票核心流程）
 
@@ -161,7 +191,7 @@ mvn clean test
    - 預期：開演日期/時間一致（格式 `MM/dd HH:mm`）
 5. CSRF 與登入身分
    - 未登入會員直接進入結帳流程
-   - 預期：先導向會員登入；若 token 過期，顯示可理解訊息而非單純 `Forbidden`
+   - 預期：先導回首頁；若 token 過期，顯示可理解訊息而非單純 `Forbidden`
 
 ## 8. CI
 

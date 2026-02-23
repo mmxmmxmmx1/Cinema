@@ -287,18 +287,18 @@ const SeatSelectionPage = {
       try {
         const checkoutPath = `/checkout/${encodeURIComponent(this.$route.params.movieId)}/showtimes/${encodeURIComponent(this.$route.params.showtimeId)}`;
 
-        sessionStorage.setItem('pendingCheckout', JSON.stringify({
-          returnTo: checkoutPath,
-          seatIds: this.selectedSeats
-        }));
-
         // Check member login before attempting a purchase.
         const authRes = await fetch('/api/auth/member', { credentials: 'same-origin' });
         const authJson = authRes.ok ? await authRes.json() : { authenticated: false };
         if (!authJson || !authJson.authenticated) {
-          window.location.href = `/member/login?returnTo=${encodeURIComponent(checkoutPath)}`;
+          sessionStorage.removeItem('pendingCheckout');
+          window.location.href = '/';
           return;
         }
+        sessionStorage.setItem('pendingCheckout', JSON.stringify({
+          returnTo: checkoutPath,
+          seatIds: this.selectedSeats
+        }));
         this.$router.push(checkoutPath);
       } catch (err) {
         this.purchaseError = err && err.message ? err.message : '無法前往結帳頁';
@@ -383,10 +383,10 @@ const CheckoutPage = {
     };
   },
   async mounted() {
-    // If the user is not logged in as MEMBER, redirect to the member login page.
+    // If the user is not logged in as MEMBER, redirect to the home page.
     const authJson = await refreshMemberAuth();
     if (!authJson || !authJson.authenticated) {
-      window.location.href = `/member/login?returnTo=${encodeURIComponent(this.checkoutPath())}`;
+      window.location.href = '/';
       return;
     }
     await this.loadCheckout();
@@ -476,7 +476,7 @@ const CheckoutPage = {
       const message = (serverMessage || '').trim();
       const checkJson = await refreshMemberAuth();
       if (!checkJson || !checkJson.authenticated) {
-        window.location.href = `/member/login?returnTo=${encodeURIComponent(this.checkoutPath())}`;
+        window.location.href = '/';
         return null;
       }
       if (checkJson.employee && !checkJson.member) {
@@ -577,7 +577,7 @@ const CheckoutPage = {
         if (!authJson || !authJson.authenticated) {
           // Common case: user is not logged in as MEMBER (or is logged in as EMPLOYEE only).
           // Member APIs will return 403 in that situation.
-          window.location.href = `/member/login?returnTo=${encodeURIComponent(this.checkoutPath())}`;
+          window.location.href = '/';
           return;
         }
 
@@ -765,7 +765,7 @@ const OrdersPage = {
   async mounted() {
     const authJson = await refreshMemberAuth();
     if (!authJson || !authJson.authenticated) {
-      window.location.href = `/member/login?returnTo=${encodeURIComponent(currentSpaPath())}`;
+      window.location.href = '/';
       return;
     }
     try {
@@ -808,7 +808,7 @@ const OrderDetailPage = {
   async mounted() {
     const authJson = await refreshMemberAuth();
     if (!authJson || !authJson.authenticated) {
-      window.location.href = `/member/login?returnTo=${encodeURIComponent(currentSpaPath())}`;
+      window.location.href = '/';
       return;
     }
     await this.loadDetail();
