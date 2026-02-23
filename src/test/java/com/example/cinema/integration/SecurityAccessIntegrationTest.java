@@ -1,5 +1,8 @@
 package com.example.cinema.integration;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -10,12 +13,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.cinema.config.SecurityConfig;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -129,5 +137,75 @@ class SecurityAccessIntegrationTest {
         mockMvc.perform(get("/api/v1/health"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("UP"));
+    }
+
+    @Test
+    @DisplayName("會員登出不應清掉員工登入狀態（同一瀏覽器 session 可雙登入）")
+    void shouldKeepEmployeeContextAfterMemberLogout() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("memberAuthenticated", true);
+        session.setAttribute("employeeAuthenticated", true);
+        session.setAttribute(
+                SecurityConfig.MEMBER_SECURITY_CONTEXT_KEY,
+                new SecurityContextImpl(new UsernamePasswordAuthenticationToken(
+                        "member01",
+                        "N/A",
+                        AuthorityUtils.createAuthorityList("ROLE_MEMBER"))));
+        session.setAttribute(
+                SecurityConfig.EMPLOYEE_SECURITY_CONTEXT_KEY,
+                new SecurityContextImpl(new UsernamePasswordAuthenticationToken(
+                        "emp01",
+                        "N/A",
+                        AuthorityUtils.createAuthorityList("ROLE_EMPLOYEE"))));
+
+        mockMvc.perform(post("/member/logout")
+                .session(session)
+                .with(user("member01").roles("MEMBER"))
+                .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/member/login"));
+
+        assertNull(session.getAttribute(SecurityConfig.MEMBER_SECURITY_CONTEXT_KEY));
+        assertNotNull(session.getAttribute(SecurityConfig.EMPLOYEE_SECURITY_CONTEXT_KEY));
+        assertTrue(Boolean.TRUE.equals(session.getAttribute("employeeAuthenticated")));
+
+        mockMvc.perform(get("/employee")
+                .session(session))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("員工登出不應清掉會員登入狀態（同一瀏覽器 session 可雙登入）")
+    void shouldKeepMemberContextAfterEmployeeLogout() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("memberAuthenticated", true);
+        session.setAttribute("employeeAuthenticated", true);
+        session.setAttribute(
+                SecurityConfig.MEMBER_SECURITY_CONTEXT_KEY,
+                new SecurityContextImpl(new UsernamePasswordAuthenticationToken(
+                        "member01",
+                        "N/A",
+                        AuthorityUtils.createAuthorityList("ROLE_MEMBER"))));
+        session.setAttribute(
+                SecurityConfig.EMPLOYEE_SECURITY_CONTEXT_KEY,
+                new SecurityContextImpl(new UsernamePasswordAuthenticationToken(
+                        "emp01",
+                        "N/A",
+                        AuthorityUtils.createAuthorityList("ROLE_EMPLOYEE"))));
+
+        mockMvc.perform(post("/employee/logout")
+                .session(session)
+                .with(user("emp01").roles("EMPLOYEE"))
+                .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/employee/login"));
+
+        assertNull(session.getAttribute(SecurityConfig.EMPLOYEE_SECURITY_CONTEXT_KEY));
+        assertNotNull(session.getAttribute(SecurityConfig.MEMBER_SECURITY_CONTEXT_KEY));
+        assertTrue(Boolean.TRUE.equals(session.getAttribute("memberAuthenticated")));
+
+        mockMvc.perform(get("/member")
+                .session(session))
+                .andExpect(status().isOk());
     }
 }

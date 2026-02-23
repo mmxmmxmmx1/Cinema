@@ -1,5 +1,6 @@
 package com.example.cinema.controller;
 
+import com.example.cinema.config.SecurityConfig;
 import com.example.cinema.dto.UpcomingBookingResponse;
 import com.example.cinema.exception.UserRegistrationException;
 import com.example.cinema.model.User.UserType;
@@ -8,6 +9,7 @@ import com.example.cinema.service.MemberOrderService;
 import com.example.cinema.service.SessionService;
 import com.example.cinema.service.SessionService.Realm;
 import com.example.cinema.service.UserService;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -17,6 +19,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -109,6 +114,12 @@ class MemberApiControllerTest {
     void shouldGetMemberSummaryWhenAuthenticated() throws Exception {
         // Given
         when(sessionService.isAuthenticated(any(), eq(Realm.MEMBER))).thenReturn(true);
+        session.setAttribute(
+                SecurityConfig.MEMBER_SECURITY_CONTEXT_KEY,
+                new SecurityContextImpl(new UsernamePasswordAuthenticationToken(
+                        "test123",
+                        "N/A",
+                        AuthorityUtils.createAuthorityList("ROLE_MEMBER"))));
         when(memberLoyaltyService.currentPoints(any())).thenReturn(360);
         when(memberOrderService.listUpcomingBookings(any(), eq(5))).thenReturn(List.of(
                 new UpcomingBookingResponse(1L, "mv-01", "沙丘:第二部", "mv-01-st1", "1號廳", 2, null, "02/12 18:40")));
@@ -134,6 +145,33 @@ class MemberApiControllerTest {
         mockMvc.perform(get("/api/member/summary")
                 .session(session))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("同 session 同時存在會員與員工登入上下文時，應正確回傳雙方狀態")
+    @WithMockUser
+    void shouldReturnDualRealmAuthStatusWhenBothContextsExist() throws Exception {
+        session.setAttribute(
+                SecurityConfig.MEMBER_SECURITY_CONTEXT_KEY,
+                new SecurityContextImpl(new UsernamePasswordAuthenticationToken(
+                        "member01",
+                        "N/A",
+                        AuthorityUtils.createAuthorityList("ROLE_MEMBER"))));
+        session.setAttribute(
+                SecurityConfig.EMPLOYEE_SECURITY_CONTEXT_KEY,
+                new SecurityContextImpl(new UsernamePasswordAuthenticationToken(
+                        "emp01",
+                        "N/A",
+                        AuthorityUtils.createAuthorityList("ROLE_EMPLOYEE"))));
+
+        mockMvc.perform(get("/api/auth/member")
+                .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authenticated").value(true))
+                .andExpect(jsonPath("$.member").value(true))
+                .andExpect(jsonPath("$.employee").value(true))
+                .andExpect(jsonPath("$.username").value("member01"))
+                .andExpect(jsonPath("$.roles", Matchers.hasItems("ROLE_MEMBER", "ROLE_EMPLOYEE")));
     }
 
     @Test

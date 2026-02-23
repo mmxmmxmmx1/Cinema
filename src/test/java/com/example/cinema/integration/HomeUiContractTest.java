@@ -80,6 +80,15 @@ class HomeUiContractTest {
         assertFalse(indexHtml.contains("onerror="));
     }
 
+    @Test
+    @DisplayName("vendor-loader 應優先使用本機 vendor 檔案，不依賴外部 CDN")
+    void shouldUseLocalWebjarsInsteadOfExternalCdn() throws IOException {
+        String loaderJs = read("src/main/resources/static/js/modules/vendor-loader.js");
+        assertTrue(loaderJs.contains("/js/vendor/vue.global.prod.js"));
+        assertFalse(loaderJs.contains("unpkg.com"));
+        assertFalse(loaderJs.contains("cdn.jsdelivr.net"));
+    }
+
     private static String read(String relativePath) throws IOException {
         return Files.readString(Path.of(relativePath), StandardCharsets.UTF_8);
     }
