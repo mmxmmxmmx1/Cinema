@@ -1,33 +1,60 @@
 (function () {
   'use strict';
 
+  let lastRuntimeErrorMessage = null;
+
+  function rememberRuntimeError(value) {
+    if (!value) {
+      return;
+    }
+    const text = String(value);
+    if (!text || text === 'undefined') {
+      return;
+    }
+    lastRuntimeErrorMessage = text;
+  }
+
+  window.addEventListener('error', function (event) {
+    if (!event) {
+      return;
+    }
+    rememberRuntimeError((event.error && (event.error.stack || event.error.message)) || event.message);
+  }, true);
+
+  window.addEventListener('unhandledrejection', function (event) {
+    if (!event) {
+      return;
+    }
+    const reason = event.reason;
+    if (reason && typeof reason === 'object') {
+      rememberRuntimeError(reason.stack || reason.message || JSON.stringify(reason));
+      return;
+    }
+    rememberRuntimeError(reason);
+  });
+
   const scriptPlan = [
     {
       globalName: 'Vue',
-      primary: 'https://unpkg.com/vue@3.3.4/dist/vue.global.prod.js',
-      fallback: 'https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.prod.js'
-    },
-    {
-      globalName: 'VueRouter',
-      primary: 'https://unpkg.com/vue-router@4.2.4/dist/vue-router.global.prod.js',
-      fallback: 'https://cdn.jsdelivr.net/npm/vue-router@4.2.4/dist/vue-router.global.prod.js'
+      primary: '/js/vendor/vue.global.prod.js?v=20260223-01',
+      fallback: '/js/vendor/vue.global.js?v=20260223-01'
     }
   ];
 
   const appScriptPlan = [
     {
       key: 'CinemaSpaShared',
-      url: '/js/modules/spa-shared.js?v=20260219-01',
+      url: '/js/modules/spa-shared.js?v=20260223-01',
       loaded: function () { return !!window.CinemaSpaShared; }
     },
     {
       key: 'CinemaAppPages',
-      url: '/js/modules/app-pages.js?v=20260219-01',
+      url: '/js/modules/app-pages.js?v=20260223-01',
       loaded: function () { return !!window.CinemaAppPages; }
     },
     {
       key: '__cinemaSpaBooted',
-      url: '/js/app.js?v=20260219-02',
+      url: '/js/app.js?v=20260223-01',
       loaded: function () { return !!window.__cinemaSpaBooted; }
     }
   ];
@@ -78,7 +105,10 @@
     }
     await loadScript(entry.url);
     if (!entry.loaded()) {
-      throw new Error(entry.key + ' did not become available after loading.');
+      const runtimeSuffix = lastRuntimeErrorMessage
+        ? ' runtime=' + lastRuntimeErrorMessage
+        : '';
+      throw new Error(entry.key + ' did not become available after loading.' + runtimeSuffix);
     }
   }
 
@@ -89,7 +119,7 @@
     }
     root.classList.add('show');
     root.innerHTML = '<div style="padding:48px 24px;color:#ffb4a8;font:600 20px/1.6 Noto Sans TC,sans-serif;text-align:center;">前端載入失敗：' +
-      String(message || '未知錯誤') + '<br/>請按 Ctrl+F5 強制重新整理後再試。</div>';
+      String(message || '未知錯誤') + '<br/>請按 Ctrl+F5 強制重新整理後再試；若仍失敗，請確認 /js/vendor/* 檔案可正常讀取。</div>';
   }
 
   async function boot() {
