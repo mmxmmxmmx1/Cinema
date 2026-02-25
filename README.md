@@ -1,11 +1,23 @@
 # Cinema (Spring Boot Side Project)
 
-電影院訂票 side project，使用 Spring Boot + Thymeleaf + MySQL，包含：
+電影院訂票 side project，技術棧為 Spring Boot + Thymeleaf + MySQL。
+
+## 專案現況（以目前程式碼為準）
+
+- Spring Boot：`3.5.11`（`pom.xml`）
+- Java：`17`
+- 資料庫：MySQL `8.0.x`（建議 `8.0.36+`）
+- 前端：Vue（本機靜態檔）+ Thymeleaf
+- 付款：預設 `mock`（可由環境變數覆寫）
+- 通知：預設 `inapp`（可由環境變數覆寫）
+
+## 功能範圍
+
 - 會員登入、訂票、付款（mock）、訂單與歷史訂單
+- 會員點數（累積與兌換）
 - 站內通知（預設保留 30 天）
-- 員工後台（每日待辦、影廳檢查表、維修申請流程）
-- 管理員功能（角色管理、場次管理 CRUD/停用）
-- 會員點數（累積 + 兌換扣點）
+- 員工後台（每日待辦、影廳檢查表、維修申請）
+- 管理員功能（角色管理、場次管理：新增/更新/停用）
 - API 防刷限流 + Trace Id 錯誤追蹤
 
 ## 架構快覽
@@ -22,29 +34,27 @@ JdbcTemplate + MySQL
 Flyway Migration
 ```
 
-補充文件：
-- 架構說明：`docs/architecture.md`
-- Demo 劇本：`docs/demo-script.md`
-- Flyway 規範：`docs/flyway-migration-rules.md`
-- 真實環境驗證清單：`docs/production-validation-checklist.md`
-- 部署與回滾 Runbook：`docs/deploy-rollback-runbook.md`
-- 瀏覽器流程自動化：`docs/browser-e2e-automation.md`
-- 壓力與併發測試計畫：`docs/load-concurrency-plan.md`
-- 監控與告警：`docs/monitoring-and-alerting.md`
-- 資料治理：`docs/data-governance.md`
-- 圖片素材規範：`docs/image-assets-policy.md`
-- 專案交接清單：`docs/handover-checklist.md`
-- 功能完成度矩陣：`docs/feature-matrix.md`
-
 ## 1. 環境需求
 
-- Java 17
-- Maven 3.9+
-- MySQL 8+
+- Java `17`
+- Maven `3.8+`（建議 `3.9+`）
+- MySQL `8.0.x`
 
-## 2. 啟動方式
+說明：
+- 專案沒有用 Maven Enforcer 強制版本；以上為目前實測可運作範圍。
+
+## 2. 啟動方式（非 Docker）
+
+重要：
+- 預設 profile 是 `prod`（`src/main/resources/application.properties`）。
+- 本機開發請明確設定 `SPRING_PROFILES_ACTIVE=dev`（建議使用 `.env`）。
+
+建議流程：
 
 ```bash
+cp .env.example .env
+# 編輯 .env 內 DB 參數（必要）
+
 mvn spring-boot:run
 ```
 
@@ -57,73 +67,83 @@ mvn spring-boot:run
 - 統一入口：`/login?target=member`、`/login?target=employee`
 
 API 路徑：
-- 既有：`/api/**`
-- 版本化別名：`/api/v1/**`（兩者目前行為相同）
+- 主要提供 `/api/**` 與 `/api/v1/**` 雙路徑
+- 實際可用端點以各 controller 的 `@RequestMapping` 宣告為準
 
 前端資源說明：
-- Vue 以本機靜態檔載入：`/js/vendor/vue.global.prod.js`
-- 不依賴外部 CDN（避免因網路/封鎖造成首頁黑畫面）
-- `/movies/**`、`/checkout/**`、`/orders/**` 為 SPA 客戶端路由，後端僅放行入口頁載入
-- 需要會員權限的敏感操作仍在 `/member/**` 與 `/member/api/**` 進行驗證，不因 SPA 路由放行而降低權限控管
+- Vue 由本機靜態檔載入：`/js/vendor/vue.global.prod.js`
+- 核心前端 JS 不依賴外部 CDN
+- 字型目前仍使用 Google Fonts（`fonts.googleapis.com` / `fonts.gstatic.com`）
 
-## 3. 資料庫設定
+會員 SPA 深連結保護（未登入導回 `/`）：
+- `/movies/{movieId}`
+- `/movies/{movieId}/showtimes/{showtimeId}`
+- `/checkout/{movieId}/showtimes/{showtimeId}`
+- `/orders`
+- `/orders/{orderId}`
 
-主要設定在 `src/main/resources/application.properties` 與 profile 檔：
+## 3. 資料庫與設定
+
+主要設定檔：
+- `src/main/resources/application.properties`
 - `src/main/resources/application-dev.properties`
 - `src/main/resources/application-prod.properties`
 
-建議使用環境變數（範例見 `.env.example`）：
-- `SPRING_PROFILES_ACTIVE=dev`
-- `DB_URL`
-- `DB_USERNAME`
-- `DB_PASSWORD`
+常用環境變數（範例：`.env.example`）：
+- `SPRING_PROFILES_ACTIVE`
+- `DB_URL` / `DB_USERNAME` / `DB_PASSWORD`
 - `APP_TIME_ZONE`（預設 `Asia/Taipei`）
+- `APP_PAYMENT_PROVIDER`（prod 預設 `mock`）
+- `APP_NOTIFICATION_PROVIDER`（prod 預設 `inapp`）
 - `APP_POINT_LOG_RETENTION_DAYS`（預設 `30`）
 - `APP_POINT_LOG_CLEANUP_MS`（預設 `3600000`）
+- `APP_SECURITY_CSRF_COOKIE_SECURE`（prod 預設 `true`）
+- `APP_SECURITY_CSRF_COOKIE_SAME_SITE`（預設 `Lax`）
 
 Flyway migration 位置：
 - `src/main/resources/db/migration`
 
-CSRF Cookie 安全設定（可透過環境變數調整）：
-- `APP_SECURITY_CSRF_COOKIE_SECURE`（prod 預設 `true`）
-- `APP_SECURITY_CSRF_COOKIE_SAME_SITE`（預設 `Lax`）
+備份與還原腳本：
+- 備份：`scripts/mysql-backup.sh`
+  - 需要：`mysqldump`、`DB_USERNAME`、`DB_PASSWORD`
+  - 可選：`DB_HOST`（預設 `localhost`）、`DB_PORT`（預設 `3306`）
+- 還原：`scripts/mysql-restore.sh <backup.sql|backup.sql.gz>`
+  - 需要：`mysql`、`DB_USERNAME`、`DB_PASSWORD`、`CONFIRM_RESTORE=yes`
 
-## Migration 規範（重要）
+## 4. Migration 規範（重要）
 
 - 已上線（已套用）的 migration 檔案不要直接修改。
-- 若要調整 schema，一律新增下一版（例如 `V12__...sql`）。
-- 如果你已經改了舊 migration 且資料庫已套用，啟動時會出現 checksum mismatch。
+- 要調整 schema，一律新增下一版（例如 `V12__...sql`）。
+- 若修改舊 migration 且資料庫已套用，啟動會出現 checksum mismatch。
 
 處理方式（二選一）：
-1. 還原舊 migration 檔案內容（推薦）。
-2. 在確認沒有風險後執行 Flyway repair（僅更新 schema history checksum，不會重跑 SQL）。
+1. 還原舊 migration 檔案內容（推薦）
+2. 在確認風險後執行 Flyway repair（只更新 schema history checksum，不重跑 SQL）
 
-CI 在 Pull Request 會檢查：
-- `src/main/resources/db/migration/V*.sql` 只能新增，不能修改/刪除既有版本檔。
+常用排查 SQL：
+- `SELECT * FROM flyway_schema_history ORDER BY installed_rank;`
+- `SELECT * FROM flyway_schema_history WHERE success = 0;`
 
-本專案常用排查：
-- 查歷史：`SELECT * FROM flyway_schema_history ORDER BY installed_rank;`
-- 找失敗：`... WHERE success = 0`
-
-## 4. 核心規則
+## 5. 核心規則
 
 - 訂票時段：每日 `07:00` 到 `22:45`
 - `22:40` 起顯示即將關閉警示
 - 單筆訂單最多 4 張
-- 同一會員在同一場次最多 4 張（不同場次/不同影廳可分別購買）
+- 同一會員在同一場次最多 4 張（不同場次可分別購買）
+- 不提供電影院地區/地址資料，不提供地區清單 API
 - 下單即鎖位（預設 15 分鐘），逾時未付款自動釋放
 - 開演前 30 分鐘內不可取消已付款訂單
 - 座位占用以「場次開始時間」為範圍，不影響下一場
-- 密碼規則：至少 6 碼，且需同時包含英文與數字（不可包含空白）
+- 密碼規則：至少 6 碼，且需同時包含英文與數字（不可含空白）
 
-## 5. 會員功能
+## 6. 會員功能
 
 - 點數累積：已付款訂單金額每 `10` 元累積 `1` 點
-- 點數兌換：可在 `/member/points` 直接兌換並扣點
+- 點數兌換：`/member/points`
 - 我的訂單：`/member/orders`
-- 歷史訂單：會員專區中「歷史訂單」區塊
+- 歷史訂單：會員專區「歷史訂單」區塊
 
-## 6. 員工與管理員功能
+## 7. 員工與管理員功能
 
 - 員工首頁：`/employee`
 - 影廳檢查表：`/employee/checklist`
@@ -135,31 +155,29 @@ CI 在 Pull Request 會檢查：
   - 可新增/更新場次
   - 可停用場次
 
-## 7. 測試
+## 8. 測試
 
-執行全部測試：
+執行預設測試（不含條件式測試）：
 
 ```bash
 mvn clean test
 ```
 
-日常開發（不使用 Docker）建議先跑基線：
+說明：
+- 會跑一般單元與整合測試。
+- 條件式測試（Playwright、真 MySQL Testcontainers）若未開旗標會顯示 `skipped`。
+
+日常開發（不使用 Docker）建議基線：
 
 ```bash
 mvn -Dtest='*Test,!RealMySqlContainerIntegrationTest' test
 ```
 
-測試包含：
-- Service / Controller 單元測試
-- Integration 測試（電影流程與新功能流程）
-- Playwright 瀏覽器 E2E（需明確開啟）
-- 真 MySQL 容器整合測試（需明確開啟）
-
-### 額外測試開關
+### 條件式測試開關
 
 Playwright 瀏覽器 E2E：
 
-先一次性安裝 Chromium（避免測試階段下載逾時）：
+先安裝 Chromium（一次性）：
 
 ```bash
 PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers \
@@ -170,7 +188,7 @@ PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers \
 java -cp "$CP" com.microsoft.playwright.CLI install chromium
 ```
 
-執行 E2E（跳過測試期下載）：
+執行 E2E：
 
 ```bash
 PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers \
@@ -185,51 +203,30 @@ mvn -Djacoco.skip=true -Dmysql.it=true -Dtest=RealMySqlContainerIntegrationTest 
 ```
 
 必要條件：
-- Playwright 首次執行會下載瀏覽器到 `.playwright-browsers/`（已在 `.gitignore` 忽略，不會上傳 git）
-- Linux 若出現缺少動態函式庫警告，可安裝：
+- Playwright 首次會下載瀏覽器到 `.playwright-browsers/`（`.gitignore` 已忽略）。
+- 需可連線 `cdn.playwright.dev`（若公司網路限制需設定代理）。
+- Linux 若缺動態函式庫可安裝：
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y libicu74 libvpx9
 ```
 
-- 若發行版版本不同，可先用 `apt-cache policy libicu* libvpx*` 查可用套件名稱
+- 真 MySQL Testcontainers 需要可用的 Docker daemon（`/var/run/docker.sock`）；若不可用，該測試會被跳過。
 
-- 真 MySQL 整合測試需要可用的 Docker daemon（`/var/run/docker.sock`）
+## 9. CI
 
-### 手動驗證腳本（訂票核心流程）
+GitHub Actions：`.github/workflows/ci.yml`
 
-1. 訂票到付款
-   - 開首頁選擇場次與座位（1~4 張）
-   - 進入結帳頁按「確認付款」
-   - 預期：訂單狀態為 `PAID`，通知出現「訂單已建立 / 付款成功」
-2. 取消訂單與釋位
-   - 進入 `/member/orders` 對可取消訂單按「取消訂單」
-   - 預期：狀態變 `CANCELLED`，原座位可再次被購買
-3. 30 分鐘取消限制
-   - 針對開演前 30 分鐘內或已開演場次嘗試取消
-   - 預期：取消被拒絕並顯示規則訊息
-4. 場次時間一致性
-   - 會員專區「即將欣賞的電影」與「我的訂單」比對同一訂單
-   - 預期：開演日期/時間一致（格式 `MM/dd HH:mm`）
-5. CSRF 與登入身分
-   - 未登入會員直接進入結帳流程
-   - 預期：先導回首頁；若 token 過期，顯示可理解訊息而非單純 `Forbidden`
-
-## 8. CI
-
-GitHub Actions：
-- `.github/workflows/ci.yml`
 - 觸發：push / pull request 到 `main` 或 `master`
-- 任務：`mvn -B clean test`
-
-## 9. 不接外部服務的完整度設計
-
-本專案預設不依賴真實金流、Email、SMS，改採：
-
-- `app.payment.provider=mock`：付款成功/失敗/逾時可切換
-- `app.notification.provider=inapp`：站內通知替代外部推播
-- 管理頁維護工具：可手動執行過期訂單/通知清理
+- `test` job：
+  - migration immutability 檢查
+  - `mvn -B clean test`
+  - 測試數量基線檢查（總數至少 50）
+- `browser-e2e` job（依賴 `test`）：
+  - 編譯測試並建立 Playwright classpath
+  - 安裝 Chromium（`install --with-deps chromium`）
+  - 執行 `BrowserAuthE2EPlaywrightTest`
 
 ## 10. Demo 資料重置
 
@@ -242,11 +239,37 @@ DB_PASSWORD='' \
 ./scripts/reset-dev-demo-data.sh
 ```
 
+注意：
+- `reset-dev-demo-data.sh` 目前只會從 `DB_URL` 解析資料庫名稱，連線本機預設 MySQL client（未使用 `DB_URL` 的 host/port）。
+
 ## 11. Docker 本機啟動（可選）
+
+前置條件：
+- 已安裝 Docker Engine 與 Docker Compose。
+- Docker daemon 已啟動。
+- 本機 `8080` / `3306` 埠未被其他服務占用。
 
 ```bash
 docker compose up --build
 ```
 
-- App: `http://localhost:8080`
-- MySQL: `localhost:3306`（`/`）
+啟動後：
+- App：`http://localhost:8080`
+- MySQL：`localhost:3306`（`/`）
+
+若本機沒有 Docker（例如 `docker: command not found`），請使用上方「非 Docker」流程。
+
+## 12. 補充文件（已提交）
+
+- 架構說明：`docs/architecture.md`
+- Demo 劇本：`docs/demo-script.md`
+- Flyway 規範：`docs/flyway-migration-rules.md`
+- 真實環境驗證清單：`docs/production-validation-checklist.md`
+- 部署與回滾 Runbook：`docs/deploy-rollback-runbook.md`
+- 瀏覽器流程自動化：`docs/browser-e2e-automation.md`
+- 壓力與併發測試計畫：`docs/load-concurrency-plan.md`
+- 監控與告警：`docs/monitoring-and-alerting.md`
+- 資料治理：`docs/data-governance.md`
+- 圖片素材規範：`docs/image-assets-policy.md`
+- 專案交接清單：`docs/handover-checklist.md`
+- 功能完成度矩陣：`docs/feature-matrix.md`
