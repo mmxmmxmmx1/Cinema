@@ -110,7 +110,8 @@ CI 在 Pull Request 會檢查：
 - 訂票時段：每日 `07:00` 到 `22:45`
 - `22:40` 起顯示即將關閉警示
 - 單筆訂單最多 4 張
-- 未結束場次期間最多持有 4 張，且只能同一影廳
+- 同一會員在同一場次最多 4 張（不同場次/不同影廳可分別購買）
+- 下單即鎖位（預設 15 分鐘），逾時未付款自動釋放
 - 開演前 30 分鐘內不可取消已付款訂單
 - 座位占用以「場次開始時間」為範圍，不影響下一場
 - 密碼規則：至少 6 碼，且需同時包含英文與數字（不可包含空白）
@@ -142,6 +143,12 @@ CI 在 Pull Request 會檢查：
 mvn clean test
 ```
 
+日常開發（不使用 Docker）建議先跑基線：
+
+```bash
+mvn -Dtest='*Test,!RealMySqlContainerIntegrationTest' test
+```
+
 測試包含：
 - Service / Controller 單元測試
 - Integration 測試（電影流程與新功能流程）
@@ -152,15 +159,29 @@ mvn clean test
 
 Playwright 瀏覽器 E2E：
 
+先一次性安裝 Chromium（避免測試階段下載逾時）：
+
 ```bash
 PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers \
-mvn -Dbrowser.e2e=true -Dtest=BrowserAuthE2EPlaywrightTest test
+mvn -B -DskipTests test-compile dependency:build-classpath -Dmdep.outputFile=target/test.classpath
+
+CP="target/test-classes:target/classes:$(cat target/test.classpath)"
+PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers \
+java -cp "$CP" com.microsoft.playwright.CLI install chromium
+```
+
+執行 E2E（跳過測試期下載）：
+
+```bash
+PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers \
+PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+mvn -Djacoco.skip=true -Dbrowser.e2e=true -Dtest=BrowserAuthE2EPlaywrightTest test
 ```
 
 真 MySQL（Testcontainers）整合測試：
 
 ```bash
-mvn -Dmysql.it=true -Dtest=RealMySqlContainerIntegrationTest test
+mvn -Djacoco.skip=true -Dmysql.it=true -Dtest=RealMySqlContainerIntegrationTest test
 ```
 
 必要條件：
@@ -169,8 +190,10 @@ mvn -Dmysql.it=true -Dtest=RealMySqlContainerIntegrationTest test
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y libicu70 libvpx7
+sudo apt-get install -y libicu74 libvpx9
 ```
+
+- 若發行版版本不同，可先用 `apt-cache policy libicu* libvpx*` 查可用套件名稱
 
 - 真 MySQL 整合測試需要可用的 Docker daemon（`/var/run/docker.sock`）
 

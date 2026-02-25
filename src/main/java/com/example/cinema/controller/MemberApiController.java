@@ -87,21 +87,26 @@ public class MemberApiController {
     }
 
     @PostMapping("/guest/watchlist/{movieId}")
-    public ResponseEntity<Void> addGuestWatchlist(@PathVariable Long movieId, HttpSession session) {
+    public ResponseEntity<Void> addGuestWatchlist(@PathVariable String movieId, HttpSession session) {
+        String safeMovieId = movieId == null ? "" : movieId.trim();
+        if (safeMovieId.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+
         @SuppressWarnings("unchecked")
-        Set<Long> set = (Set<Long>) session.getAttribute(sessionService.guestWatchlistKey());
+        Set<String> set = (Set<String>) session.getAttribute(sessionService.guestWatchlistKey());
         if (set == null) {
             set = new HashSet<>();
             session.setAttribute(sessionService.guestWatchlistKey(), set);
         }
-        set.add(movieId);
+        set.add(safeMovieId);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/guest/watchlist")
-    public ResponseEntity<Set<Long>> getGuestWatchlist(HttpSession session) {
+    public ResponseEntity<Set<String>> getGuestWatchlist(HttpSession session) {
         @SuppressWarnings("unchecked")
-        Set<Long> set = (Set<Long>) session.getAttribute(sessionService.guestWatchlistKey());
+        Set<String> set = (Set<String>) session.getAttribute(sessionService.guestWatchlistKey());
         if (set == null) {
             set = new HashSet<>();
         }

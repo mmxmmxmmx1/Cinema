@@ -17,7 +17,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.AuthorityUtils;
@@ -47,13 +47,13 @@ class MemberApiControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private SessionService sessionService;
-    @MockBean
+    @MockitoBean
     private MemberLoyaltyService memberLoyaltyService;
-    @MockBean
+    @MockitoBean
     private MemberOrderService memberOrderService;
-    @MockBean
+    @MockitoBean
     private UserService userService;
 
     private MockHttpSession session;
@@ -69,7 +69,7 @@ class MemberApiControllerTest {
     @WithMockUser
     void shouldAddMovieToGuestWatchlist() throws Exception {
         // Given
-        Long movieId = 1L;
+        String movieId = "mv-01";
 
         // When & Then
         mockMvc.perform(post("/api/guest/watchlist/{movieId}", movieId)
@@ -83,9 +83,9 @@ class MemberApiControllerTest {
     @WithMockUser
     void shouldGetGuestWatchlist() throws Exception {
         // Given
-        Set<Long> watchlist = new HashSet<>();
-        watchlist.add(1L);
-        watchlist.add(2L);
+        Set<String> watchlist = new HashSet<>();
+        watchlist.add("mv-01");
+        watchlist.add("mv-02");
         session.setAttribute("guest.watchlist", watchlist);
 
         // When & Then
@@ -179,17 +179,17 @@ class MemberApiControllerTest {
     @WithMockUser
     void shouldAddMultipleMoviesToWatchlist() throws Exception {
         // When & Then
-        mockMvc.perform(post("/api/guest/watchlist/{movieId}", 1L)
+        mockMvc.perform(post("/api/guest/watchlist/{movieId}", "mv-01")
                 .session(session)
                 .with(csrf()))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(post("/api/guest/watchlist/{movieId}", 2L)
+        mockMvc.perform(post("/api/guest/watchlist/{movieId}", "mv-02")
                 .session(session)
                 .with(csrf()))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(post("/api/guest/watchlist/{movieId}", 3L)
+        mockMvc.perform(post("/api/guest/watchlist/{movieId}", "mv-03")
                 .session(session)
                 .with(csrf()))
                 .andExpect(status().isNoContent());

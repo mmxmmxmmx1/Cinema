@@ -133,18 +133,18 @@ class UserServiceTest {
         // 模擬現有觀看清單（空列表）
         when(jdbcTemplate.queryForList(
             eq("SELECT movie_id FROM user_watchlist WHERE user_id = ?"),
-            eq(Long.class),
+            eq(String.class),
             eq(USER_ID))).thenReturn(Collections.emptyList());
         
         // 執行測試
-        Set<Long> movieIds = new HashSet<>(Arrays.asList(1L, 2L, 3L));
+        Set<String> movieIds = new HashSet<>(Arrays.asList("mv-01", "mv-02", "mv-03"));
         userService.mergeGuestWatchlistIntoUser(TEST_USERNAME, movieIds);
         
         // 驗證插入操作被調用3次
         verify(jdbcTemplate, times(3)).update(
             eq("INSERT INTO user_watchlist (user_id, movie_id) VALUES (?, ?)"),
             eq(USER_ID),
-            anyLong()
+            anyString()
         );
     }
     
@@ -156,18 +156,18 @@ class UserServiceTest {
         // 模擬現有觀看清單（已包含電影ID 1和2）
         when(jdbcTemplate.queryForList(
             eq("SELECT movie_id FROM user_watchlist WHERE user_id = ?"),
-            eq(Long.class),
-            eq(USER_ID))).thenReturn(Arrays.asList(1L, 2L));
+            eq(String.class),
+            eq(USER_ID))).thenReturn(Arrays.asList("mv-01", "mv-02"));
         
         // 執行測試（包含重複的電影ID）
-        Set<Long> movieIds = new HashSet<>(Arrays.asList(1L, 2L, 3L));
+        Set<String> movieIds = new HashSet<>(Arrays.asList("mv-01", "mv-02", "mv-03"));
         userService.mergeGuestWatchlistIntoUser(TEST_USERNAME, movieIds);
         
         // 驗證只插入了新的電影ID（3）
         verify(jdbcTemplate, times(1)).update(
             eq("INSERT INTO user_watchlist (user_id, movie_id) VALUES (?, ?)"),
             eq(USER_ID),
-            eq(3L)
+            eq("mv-03")
         );
     }
 

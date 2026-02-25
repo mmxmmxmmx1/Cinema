@@ -204,7 +204,7 @@ public class SecurityConfig {
                                 .maxAgeInSeconds(31536000))
                         .frameOptions(frame -> frame.sameOrigin())
                         .referrerPolicy(ref -> ref.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
-                        .permissionsPolicy(policy -> policy.policy("camera=(), microphone=(), geolocation=()")))
+                        .permissionsPolicyHeader(policy -> policy.policy("camera=(), microphone=(), geolocation=()")))
                 .formLogin(login -> login
                         .loginPage("/employee/login").permitAll()
                         .loginProcessingUrl("/employee/login")
@@ -338,7 +338,7 @@ public class SecurityConfig {
                                 .maxAgeInSeconds(31536000))
                         .frameOptions(frame -> frame.sameOrigin())
                         .referrerPolicy(ref -> ref.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
-                        .permissionsPolicy(policy -> policy.policy("camera=(), microphone=(), geolocation=()")))
+                        .permissionsPolicyHeader(policy -> policy.policy("camera=(), microphone=(), geolocation=()")))
                 .formLogin(login -> login
                         .loginPage("/member/login").permitAll()
                         .loginProcessingUrl("/member/login")
@@ -438,7 +438,7 @@ public class SecurityConfig {
                         .maxAgeInSeconds(31536000))
                 .frameOptions(frame -> frame.sameOrigin())
                 .referrerPolicy(ref -> ref.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
-                .permissionsPolicy(policy -> policy.policy("camera=(), microphone=(), geolocation=()")));
+                .permissionsPolicyHeader(policy -> policy.policy("camera=(), microphone=(), geolocation=()")));
         return http.build();
     }
 
@@ -578,7 +578,7 @@ public class SecurityConfig {
         }
 
         @SuppressWarnings("unchecked")
-        Set<Long> watchlist = (Set<Long>) session.getAttribute(sessionService.guestWatchlistKey());
+        Set<String> watchlist = (Set<String>) session.getAttribute(sessionService.guestWatchlistKey());
         if (watchlist != null && !watchlist.isEmpty()) {
             userService.mergeGuestWatchlistIntoUser(authentication.getName(), watchlist);
             session.removeAttribute(sessionService.guestWatchlistKey());

@@ -66,4 +66,4 @@ jobs:
           java -cp "$CP" com.microsoft.playwright.CLI install --with-deps chromium
 
       - name: Run Browser E2E Smoke
-        run: mvn -B -Dbrowser.e2e=true -Dtest=BrowserAuthE2EPlaywrightTest test
+        run: mvn -B -Djacoco.skip=true -Dbrowser.e2e=true -Dtest=BrowserAuthE2EPlaywrightTest test

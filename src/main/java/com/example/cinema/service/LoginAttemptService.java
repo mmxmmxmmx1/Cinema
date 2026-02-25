@@ -157,17 +157,16 @@ public class LoginAttemptService {
         }
 
         Instant now = AppClock.nowInstant();
-        state.lastSeen = now;
         if (state.lockedUntil != null) {
             if (state.lockedUntil.isAfter(now)) {
-                saveStateToDb(target, state);
+                updateLastSeenInDb(target, now);
                 return new LoginAttemptStatus(true, 0, Duration.between(now, state.lockedUntil));
             }
             deleteStateFromDb(target);
             return new LoginAttemptStatus(false, MAX_ATTEMPTS, Duration.ZERO);
         }
 
-        saveStateToDb(target, state);
+        updateLastSeenInDb(target, now);
         int remaining = Math.max(0, MAX_ATTEMPTS - state.failedAttempts);
         return new LoginAttemptStatus(false, remaining, Duration.ZERO);
     }
@@ -176,37 +175,20 @@ public class LoginAttemptService {
         logger.debug("記錄登入失敗 - 領域: {}, 用戶: {}", realm, username);
         Instant now = AppClock.nowInstant();
 
-        AttemptState state = loadStateFromDb(target);
-        if (state == null) {
-            logger.debug("為用戶 {} 創建新的嘗試狀態", username);
-            state = new AttemptState();
-        }
-        state.lastSeen = now;
+        // Create the row first, then atomically update failure counters in one SQL statement.
+        ensureStateRowExists(target, now);
+        incrementFailureStateInDb(target, now);
 
-        if (state.lockedUntil != null && state.lockedUntil.isAfter(now)) {
+        AttemptState updated = loadStateFromDb(target);
+        if (updated == null) {
+            return new LoginAttemptStatus(false, MAX_ATTEMPTS - 1, Duration.ZERO);
+        }
+        if (updated.lockedUntil != null && updated.lockedUntil.isAfter(now)) {
             logger.warn("帳戶已鎖定 - 領域: {}, 用戶: {}", realm, username);
-            saveStateToDb(target, state);
-            return new LoginAttemptStatus(true, 0, Duration.between(now, state.lockedUntil));
+            return new LoginAttemptStatus(true, 0, Duration.between(now, updated.lockedUntil));
         }
-
-        if (state.lockedUntil != null && !state.lockedUntil.isAfter(now)) {
-            logger.info("帳戶鎖定已過期，重置計數器 - 領域: {}, 用戶: {}", realm, username);
-            state.failedAttempts = 0;
-            state.lockedUntil = null;
-        }
-
-        state.failedAttempts++;
-        logger.debug("登入失敗次數: {}/{} - 領域: {}, 用戶: {}", state.failedAttempts, MAX_ATTEMPTS, realm, username);
-
-        if (state.failedAttempts >= MAX_ATTEMPTS) {
-            state.lockedUntil = now.plus(LOCK_DURATION);
-            logger.warn("達到最大失敗次數，帳戶已鎖定 {} 分鐘 - 領域: {}, 用戶: {}", LOCK_DURATION.toMinutes(), realm, username);
-        }
-
-        saveStateToDb(target, state);
-        return state.lockedUntil != null && state.lockedUntil.isAfter(now)
-                ? new LoginAttemptStatus(true, 0, Duration.between(now, state.lockedUntil))
-                : new LoginAttemptStatus(false, Math.max(0, MAX_ATTEMPTS - state.failedAttempts), Duration.ZERO);
+        logger.debug("登入失敗次數: {}/{} - 領域: {}, 用戶: {}", updated.failedAttempts, MAX_ATTEMPTS, realm, username);
+        return new LoginAttemptStatus(false, Math.max(0, MAX_ATTEMPTS - updated.failedAttempts), Duration.ZERO);
     }
 
     private AttemptState loadStateFromDb(NormalizedTarget target) {
@@ -229,24 +211,63 @@ public class LoginAttemptService {
         return rows.isEmpty() ? null : rows.get(0);
     }
 
-    private void saveStateToDb(NormalizedTarget target, AttemptState state) {
+    private void updateLastSeenInDb(NormalizedTarget target, Instant lastSeenAt) {
         JdbcTemplate jdbc = this.jdbcTemplate;
         if (jdbc == null) {
             return;
         }
-        if (state.lastSeen == null) {
-            state.lastSeen = AppClock.nowInstant();
+        jdbc.update(
+                "UPDATE login_attempt_state SET last_seen = ? WHERE realm = ? AND username = ?",
+                toTimestamp(lastSeenAt),
+                target.realm(),
+                target.username());
+    }
+
+    private void ensureStateRowExists(NormalizedTarget target, Instant now) {
+        JdbcTemplate jdbc = this.jdbcTemplate;
+        if (jdbc == null) {
+            return;
         }
         jdbc.update(
-                "INSERT INTO login_attempt_state (realm, username, failed_attempts, locked_until, last_seen) " +
-                        "VALUES (?, ?, ?, ?, ?) " +
-                        "ON DUPLICATE KEY UPDATE failed_attempts = VALUES(failed_attempts), " +
-                        "locked_until = VALUES(locked_until), last_seen = VALUES(last_seen)",
+                "INSERT IGNORE INTO login_attempt_state (realm, username, failed_attempts, locked_until, last_seen) " +
+                        "VALUES (?, ?, 0, NULL, ?)",
                 target.realm(),
                 target.username(),
-                state.failedAttempts,
-                toTimestamp(state.lockedUntil),
-                toTimestamp(state.lastSeen));
+                toTimestamp(now));
+    }
+
+    private void incrementFailureStateInDb(NormalizedTarget target, Instant now) {
+        JdbcTemplate jdbc = this.jdbcTemplate;
+        if (jdbc == null) {
+            return;
+        }
+        Instant lockUntil = now.plus(LOCK_DURATION);
+        jdbc.update(
+                "UPDATE login_attempt_state " +
+                        "SET failed_attempts = CASE " +
+                        "  WHEN locked_until IS NOT NULL AND locked_until > ? THEN failed_attempts " +
+                        "  WHEN locked_until IS NOT NULL AND locked_until <= ? THEN 1 " +
+                        "  ELSE failed_attempts + 1 " +
+                        "END, " +
+                        "locked_until = CASE " +
+                        "  WHEN locked_until IS NOT NULL AND locked_until > ? THEN locked_until " +
+                        "  WHEN (CASE " +
+                        "    WHEN locked_until IS NOT NULL AND locked_until <= ? THEN 1 " +
+                        "    ELSE failed_attempts + 1 " +
+                        "  END) >= ? THEN ? " +
+                        "  ELSE NULL " +
+                        "END, " +
+                        "last_seen = ? " +
+                        "WHERE realm = ? AND username = ?",
+                toTimestamp(now),
+                toTimestamp(now),
+                toTimestamp(now),
+                toTimestamp(now),
+                MAX_ATTEMPTS,
+                toTimestamp(lockUntil),
+                toTimestamp(now),
+                target.realm(),
+                target.username());
     }
 
     private void deleteStateFromDb(NormalizedTarget target) {
@@ -276,22 +297,23 @@ public class LoginAttemptService {
         }
 
         Boolean ready = dbTableAvailable;
-        if (ready != null) {
-            return ready;
+        if (Boolean.TRUE.equals(ready)) {
+            return true;
         }
 
         synchronized (this) {
-            if (dbTableAvailable != null) {
-                return dbTableAvailable;
+            if (Boolean.TRUE.equals(dbTableAvailable)) {
+                return true;
             }
             try {
                 jdbc.queryForObject("SELECT COUNT(*) FROM login_attempt_state WHERE 1 = 0", Integer.class);
                 dbTableAvailable = true;
+                return true;
             } catch (DataAccessException ex) {
                 logger.debug("login_attempt_state 尚未就緒，改用記憶體登入嘗試追蹤。", ex);
                 dbTableAvailable = false;
+                return false;
             }
-            return dbTableAvailable;
         }
     }
 

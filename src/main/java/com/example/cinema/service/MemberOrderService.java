@@ -24,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -48,8 +49,7 @@ public class MemberOrderService {
     private static final Logger log = LoggerFactory.getLogger(MemberOrderService.class);
 
     private static final int MAX_TICKETS_PER_ORDER = 4;
-    private static final int MAX_TICKETS_PER_ACTIVE_WINDOW = 4;
-    private static final int DEFAULT_SHOW_DURATION_MINUTES = 120;
+    private static final int MAX_TICKETS_PER_SCREENING_PER_MEMBER = 4;
     private static final int UNIT_PRICE = 300;
     private static final DateTimeFormatter SHOW_START_FORMATTER = DateTimeFormatter.ofPattern("MM/dd HH:mm")
             .withZone(AppClock.zoneId());
@@ -102,7 +102,7 @@ public class MemberOrderService {
         String auditorium = details.getShowtime().getAuditorium();
 
         assertSeatsAvailable(details, requested);
-        enforceActiveShowtimeSingleAuditoriumRule(member.getId(), auditorium, requested.size());
+        enforcePerScreeningTicketCap(member.getId(), movieId, showtimeId, requested.size());
 
         int totalPrice = UNIT_PRICE * requested.size();
         KeyHolder keyHolder = new GeneratedKeyHolder();
@@ -129,6 +129,10 @@ public class MemberOrderService {
         for (String seatId : requested) {
             jdbcTemplate.update("INSERT INTO member_order_items (order_id, seat_id) VALUES (?, ?)", orderId, seatId);
         }
+        Instant showStartInstant = movieService.resolveShowStartInstant(movieId, showtimeId);
+        Timestamp showStartAt = Timestamp.from(showStartInstant);
+        Date showDate = Date.valueOf(showStartInstant.atZone(AppClock.zoneId()).toLocalDate());
+        reserveSeatsForOrder(orderId, member.getId(), movieId, showtimeId, auditorium, requested, showDate, showStartAt);
 
         memberNotificationService.notifyOrderCreated(member.getId(), orderId, totalPrice);
         auditLogService.log("MEMBER", String.valueOf(member.getId()), "ORDER_CREATE", "ORDER", String.valueOf(orderId),
@@ -234,8 +238,23 @@ public class MemberOrderService {
                 throw new TicketPurchaseRuleViolationException("訂單影廳資訊不一致，請重新下單。");
             }
 
-            assertSeatsAvailable(details, seatIds);
-            enforceActiveShowtimeSingleAuditoriumRule(member.getId(), auditorium, seatIds.size());
+            enforcePerScreeningTicketCap(member.getId(), movieId, showtimeId, seatIds.size(), orderId);
+            Instant showStartInstant = movieService.resolveShowStartInstant(movieId, showtimeId);
+            Timestamp showStartAt = Timestamp.from(showStartInstant);
+            Date showDate = Date.valueOf(showStartInstant.atZone(AppClock.zoneId()).toLocalDate());
+            Set<String> heldSeats = new LinkedHashSet<>(jdbcTemplate.queryForList(
+                    "SELECT seat_id FROM member_tickets WHERE order_id = ? ORDER BY seat_id",
+                    String.class,
+                    orderId));
+            Set<String> expectedSeats = new LinkedHashSet<>(seatIds);
+            if (heldSeats.isEmpty()) {
+                // Legacy orders created before seat-hold rollout reserve seats at payment.
+                assertSeatsAvailable(details, seatIds);
+                reserveSeatsForOrder(orderId, member.getId(), movieId, showtimeId, auditorium, expectedSeats, showDate,
+                        showStartAt);
+            } else if (!heldSeats.equals(expectedSeats)) {
+                throw new TicketPurchaseRuleViolationException("訂單座位鎖定資料異常，請取消後重新下單。");
+            }
 
             PaymentMode effectiveMode = mode == null ? PaymentMode.SUCCESS : mode;
             long paymentTxId = insertPaymentTransaction(orderId, member.getId(), totalPrice, effectiveMode);
@@ -251,21 +270,6 @@ public class MemberOrderService {
                 auditLogService.log("MEMBER", String.valueOf(member.getId()), "ORDER_PAY", "ORDER", String.valueOf(orderId),
                         "FAILED", "mode=" + effectiveMode + ",reason=" + reason);
                 return getOrderDetail(member.getId(), orderId);
-            }
-
-            // Reserve seats only when payment succeeds.
-            Date operationalDate = Date.valueOf(movieService.currentOperationalDate());
-            Timestamp showStartAt = Timestamp.from(movieService.resolveShowStartInstant(movieId, showtimeId));
-            for (String seatId : seatIds) {
-                try {
-                    jdbcTemplate.update(
-                            "INSERT INTO member_tickets (order_id, member_id, movie_id, showtime_id, show_date, show_start_at, auditorium, seat_id) " +
-                                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                            orderId, member.getId(), movieId, showtimeId, operationalDate, showStartAt, auditorium, seatId);
-                } catch (Exception ex) {
-                    // Roll back this transaction to avoid partial ticket inserts.
-                    throw new TicketPurchaseConflictException("座位已被其他人搶先購買：" + seatId, ex);
-                }
             }
 
             if (!OrderStatus.fromDb(String.valueOf(order.get("status"))).canTransitionTo(OrderStatus.PAID)) {
@@ -492,9 +496,10 @@ public class MemberOrderService {
                             "WHERE id = ? AND status = 'PENDING'",
                     orderId);
             if (updated > 0) {
+                int released = jdbcTemplate.update("DELETE FROM member_tickets WHERE order_id = ?", orderId);
                 memberNotificationService.notifyOrderExpired(memberId, orderId, pendingTimeoutMinutes);
                 auditLogService.log("SYSTEM", "scheduler", "ORDER_EXPIRE", "ORDER", String.valueOf(orderId), "SUCCESS",
-                        "pending-timeout-minutes=" + pendingTimeoutMinutes);
+                        "pending-timeout-minutes=" + pendingTimeoutMinutes + ",released-seats=" + released);
             }
         }
         log.info("Expired {} pending order(s).", rows.size());
@@ -585,10 +590,13 @@ public class MemberOrderService {
     }
 
     private void markOrderExpired(long orderId, String reason) {
-        jdbcTemplate.update(
+        int updated = jdbcTemplate.update(
                 "UPDATE member_orders SET status = 'EXPIRED', expired_at = NOW(), failure_reason = ? " +
                         "WHERE id = ? AND status IN ('PENDING', 'FAILED')",
                 reason, orderId);
+        if (updated > 0) {
+            jdbcTemplate.update("DELETE FROM member_tickets WHERE order_id = ?", orderId);
+        }
     }
 
     private long insertPaymentTransaction(long orderId, long memberId, int amount, PaymentMode mode) {
@@ -956,58 +964,70 @@ public class MemberOrderService {
         return requested;
     }
 
-    private void enforceActiveShowtimeSingleAuditoriumRule(long memberId, String requestedAuditorium, int requestedCount) {
-        List<Map<String, Object>> grouped = jdbcTemplate.queryForList(
-                "SELECT mt.movie_id, mt.showtime_id, mt.auditorium, COUNT(*) AS cnt, " +
-                        "MIN(mt.show_start_at) AS show_start_at, MIN(mt.show_date) AS show_date " +
-                        "FROM member_tickets mt " +
-                        "WHERE mt.member_id = ? " +
-                        "AND (mt.order_id IS NULL OR EXISTS (SELECT 1 FROM member_orders mo WHERE mo.id = mt.order_id AND mo.status = 'PAID')) " +
-                        "GROUP BY mt.movie_id, mt.showtime_id, mt.auditorium",
-                memberId);
+    private void enforcePerScreeningTicketCap(long memberId, String movieId, String showtimeId, int requestedCount) {
+        enforcePerScreeningTicketCap(memberId, movieId, showtimeId, requestedCount, null);
+    }
 
-        Instant now = AppClock.nowInstant();
-        Map<String, Integer> activeByAuditorium = new HashMap<>();
-        int activeCount = 0;
-
-        for (Map<String, Object> row : grouped) {
-            String movieId = String.valueOf(row.get("movie_id"));
-            String showtimeId = String.valueOf(row.get("showtime_id"));
-            Instant showStartAt = resolveShowStartInstant(movieId, showtimeId, row.get("show_start_at"), row.get("show_date"));
-            if (showStartAt == null) {
-                continue;
-            }
-
-            int durationMinutes = movieService.getShowtime(movieId, showtimeId)
-                    .map(showtime -> Math.max(1, showtime.getDurationMinutes()))
-                    .orElse(DEFAULT_SHOW_DURATION_MINUTES);
-            Instant showEndAt = showStartAt.plus(durationMinutes, ChronoUnit.MINUTES);
-            if (!showEndAt.isAfter(now)) {
-                continue;
-            }
-
-            int count = ((Number) row.get("cnt")).intValue();
-            String auditorium = String.valueOf(row.get("auditorium"));
-            activeByAuditorium.merge(auditorium, count, Integer::sum);
-            activeCount += count;
+    private void enforcePerScreeningTicketCap(long memberId, String movieId, String showtimeId, int requestedCount,
+            Long excludedOrderId) {
+        Instant showStartAt = movieService.resolveShowStartInstant(movieId, showtimeId);
+        Timestamp holdThreshold = Timestamp.from(AppClock.nowInstant().minus(pendingTimeoutMinutes, ChronoUnit.MINUTES));
+        Integer existingCount;
+        if (excludedOrderId == null) {
+            existingCount = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) " +
+                            "FROM member_tickets mt " +
+                            "LEFT JOIN member_orders mo ON mo.id = mt.order_id " +
+                            "WHERE mt.member_id = ? AND mt.movie_id = ? AND mt.showtime_id = ? AND mt.show_start_at = ? " +
+                            "AND (mt.order_id IS NULL OR mo.status = 'PAID' OR (mo.status IN ('PENDING', 'FAILED') AND mo.created_at >= ?))",
+                    Integer.class,
+                    memberId,
+                    movieId,
+                    showtimeId,
+                    Timestamp.from(showStartAt),
+                    holdThreshold);
+        } else {
+            existingCount = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) " +
+                            "FROM member_tickets mt " +
+                            "LEFT JOIN member_orders mo ON mo.id = mt.order_id " +
+                            "WHERE mt.member_id = ? AND mt.movie_id = ? AND mt.showtime_id = ? AND mt.show_start_at = ? " +
+                            "AND (mt.order_id IS NULL OR mo.status = 'PAID' OR (mo.status IN ('PENDING', 'FAILED') AND mo.created_at >= ?)) " +
+                            "AND (mt.order_id IS NULL OR mt.order_id <> ?)",
+                    Integer.class,
+                    memberId,
+                    movieId,
+                    showtimeId,
+                    Timestamp.from(showStartAt),
+                    holdThreshold,
+                    excludedOrderId);
         }
-
-        if (activeByAuditorium.size() > 1) {
-            throw new TicketPurchaseRuleViolationException("你目前有未結束場次且分布於不同影廳，請待場次結束後再購買。");
-        }
-
-        if (activeByAuditorium.size() == 1) {
-            String existingAuditorium = activeByAuditorium.keySet().iterator().next();
-            if (!existingAuditorium.equals(requestedAuditorium)) {
-                throw new TicketPurchaseRuleViolationException(
-                        "你目前仍有未結束場次，僅能在同一影廳購買（目前影廳：" + existingAuditorium + "）。");
-            }
-        }
-
-        if (activeCount + requestedCount > MAX_TICKETS_PER_ACTIVE_WINDOW) {
-            int remaining = Math.max(0, MAX_TICKETS_PER_ACTIVE_WINDOW - activeCount);
+        int existing = existingCount == null ? 0 : existingCount.intValue();
+        if (existing + requestedCount > MAX_TICKETS_PER_SCREENING_PER_MEMBER) {
+            int remaining = Math.max(0, MAX_TICKETS_PER_SCREENING_PER_MEMBER - existing);
             throw new TicketPurchaseRuleViolationException(
-                    "目前未結束場次最多只能持有 4 張票（你已持有 " + activeCount + " 張，剩餘可買 " + remaining + " 張）。");
+                    "同一場次同一會員最多只能持有 4 張票（你已持有 " + existing + " 張，剩餘可買 " + remaining + " 張）。");
+        }
+    }
+
+    private void reserveSeatsForOrder(
+            long orderId,
+            long memberId,
+            String movieId,
+            String showtimeId,
+            String auditorium,
+            Collection<String> seatIds,
+            Date showDate,
+            Timestamp showStartAt) {
+        for (String seatId : seatIds) {
+            try {
+                jdbcTemplate.update(
+                        "INSERT INTO member_tickets (order_id, member_id, movie_id, showtime_id, show_date, show_start_at, auditorium, seat_id) " +
+                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        orderId, memberId, movieId, showtimeId, showDate, showStartAt, auditorium, seatId);
+            } catch (DuplicateKeyException ex) {
+                throw new TicketPurchaseConflictException("座位已被其他人搶先購買：" + seatId, ex);
+            }
         }
     }
 

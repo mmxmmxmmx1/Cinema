@@ -42,18 +42,17 @@ public class ApiRateLimitService {
         String key = safeAction + "|" + safeSubject;
         Instant now = AppClock.nowInstant();
         Instant cutoff = now.minus(window);
-
-        if (isDbStoreAvailable()) {
-            try {
-                checkWithDb(safeAction, safeSubject, limitPerWindow, now, cutoff);
-                return;
-            } catch (DataAccessException ex) {
-                markDbUnavailable(ex);
-            }
-        }
-
         ArrayDeque<Instant> queue = buckets.computeIfAbsent(key, k -> new ArrayDeque<>());
         synchronized (queue) {
+            // Serialize by (action,subject) in-process so DB + memory paths have deterministic limits.
+            if (isDbStoreAvailable()) {
+                try {
+                    checkWithDb(safeAction, safeSubject, limitPerWindow, now, cutoff);
+                    return;
+                } catch (DataAccessException ex) {
+                    markDbUnavailable(ex);
+                }
+            }
             while (!queue.isEmpty() && queue.peekFirst().isBefore(cutoff)) {
                 queue.pollFirst();
             }
@@ -91,21 +90,22 @@ public class ApiRateLimitService {
             return false;
         }
         Boolean ready = dbTableAvailable;
-        if (ready != null) {
-            return ready;
+        if (Boolean.TRUE.equals(ready)) {
+            return true;
         }
         synchronized (this) {
-            if (dbTableAvailable != null) {
-                return dbTableAvailable;
+            if (Boolean.TRUE.equals(dbTableAvailable)) {
+                return true;
             }
             try {
                 jdbc.queryForObject("SELECT COUNT(*) FROM api_rate_limit_events WHERE 1 = 0", Integer.class);
                 dbTableAvailable = true;
+                return true;
             } catch (DataAccessException ex) {
                 logger.debug("api_rate_limit_events 尚未就緒，改用記憶體限流。", ex);
                 dbTableAvailable = false;
+                return false;
             }
-            return dbTableAvailable;
         }
     }
 

@@ -29,26 +29,42 @@ mvn -Dtest=MemberOrderWebE2EIntegrationTest,SecurityAccessIntegrationTest,HomeUi
   - 員工登入/登出
   - 匿名使用者直接開啟 `checkout/orders` 深連結導回首頁
 
-執行方式：
+執行方式（不使用 Docker）：
+
+先一次性安裝 Chromium：
 
 ```bash
 PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers \
-mvn -Dbrowser.e2e=true -Dtest=BrowserAuthE2EPlaywrightTest test
+mvn -B -DskipTests test-compile dependency:build-classpath -Dmdep.outputFile=target/test.classpath
+
+CP="target/test-classes:target/classes:$(cat target/test.classpath)"
+PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers \
+java -cp "$CP" com.microsoft.playwright.CLI install chromium
 ```
 
-Linux 若出現缺少函式庫警告（`libicudata.so.70`、`libvpx.so.7`）可安裝：
+再執行測試（避免測試期下載瀏覽器）：
+
+```bash
+PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers \
+PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+mvn -Djacoco.skip=true -Dbrowser.e2e=true -Dtest=BrowserAuthE2EPlaywrightTest test
+```
+
+Linux 若出現缺少函式庫警告（如 `libicudata.so.74`、`libvpx.so.9`）可安裝：
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y libicu70 libvpx7
+sudo apt-get install -y libicu74 libvpx9
 ```
+
+若發行版版本不同，先用 `apt-cache policy libicu* libvpx*` 查可用套件名稱。
 
 ## 3) 真 MySQL 容器整合測試
 
 Playwright 之外，另有真 MySQL 測試（Testcontainers）：
 
 ```bash
-mvn -Dmysql.it=true -Dtest=RealMySqlContainerIntegrationTest test
+mvn -Djacoco.skip=true -Dmysql.it=true -Dtest=RealMySqlContainerIntegrationTest test
 ```
 
 必要條件：Docker daemon 可用。

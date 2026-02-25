@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -24,6 +26,7 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.options.WaitUntilState;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -45,7 +48,9 @@ class BrowserAuthE2EPlaywrightTest {
 
     @BeforeAll
     void startBrowser() {
-        playwright = Playwright.create();
+        Map<String, String> env = new HashMap<>(System.getenv());
+        env.putIfAbsent("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1");
+        playwright = Playwright.create(new Playwright.CreateOptions().setEnv(env));
         browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(true));
     }
 
@@ -82,7 +87,7 @@ class BrowserAuthE2EPlaywrightTest {
     @Test
     @DisplayName("會員應可從登入頁登入並成功登出")
     void memberShouldLoginAndLogout() {
-        page.navigate(baseUrl("/member/login"));
+        navigate(baseUrl("/member/login"));
         page.fill("input[name='username']", "test123");
         page.fill("input[name='password']", "test123");
         page.click("button[type='submit']");
@@ -99,7 +104,7 @@ class BrowserAuthE2EPlaywrightTest {
     @Test
     @DisplayName("員工應可從登入頁登入並成功登出")
     void employeeShouldLoginAndLogout() {
-        page.navigate(baseUrl("/employee/login"));
+        navigate(baseUrl("/employee/login"));
         page.fill("input[name='username']", "emp01");
         page.fill("input[name='password']", "emp01");
         page.click("button[type='submit']");
@@ -116,7 +121,7 @@ class BrowserAuthE2EPlaywrightTest {
     @Test
     @DisplayName("未登入直接開啟 checkout 深連結應導回首頁")
     void anonymousCheckoutDeepLinkShouldRedirectHome() {
-        page.navigate(baseUrl("/checkout/mv-01/showtimes/mv-01-st1"));
+        navigate(baseUrl("/checkout/mv-01/showtimes/mv-01-st1"));
         waitForPath("/");
         assertEquals("/", currentPath());
     }
@@ -124,9 +129,13 @@ class BrowserAuthE2EPlaywrightTest {
     @Test
     @DisplayName("未登入直接開啟 orders 深連結應導回首頁")
     void anonymousOrdersDeepLinkShouldRedirectHome() {
-        page.navigate(baseUrl("/orders/123"));
+        navigate(baseUrl("/orders/123"));
         waitForPath("/");
         assertEquals("/", currentPath());
+    }
+
+    private void navigate(String url) {
+        page.navigate(url, new Page.NavigateOptions().setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
     }
 
     private String baseUrl(String path) {

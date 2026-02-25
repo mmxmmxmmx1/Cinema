@@ -4,10 +4,12 @@ import java.time.LocalTime;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -34,6 +36,8 @@ public class MovieService {
 
     private final Map<String, Movie> fallbackCatalog;
     private final Map<String, CinemaLocationItem> fallbackLocations;
+    @Value("${app.order.pending-timeout-minutes:15}")
+    private int pendingTimeoutMinutes;
     private JdbcTemplate jdbcTemplate;
 
     public MovieService() {
@@ -942,15 +946,18 @@ public class MovieService {
         if (jdbcTemplate != null) {
             try {
                 Instant showStartAt = resolveShowStartInstant(movieId, showtimeId);
+                Instant holdThreshold = AppClock.nowInstant().minus(Math.max(1, pendingTimeoutMinutes), ChronoUnit.MINUTES);
                 List<String> booked = jdbcTemplate.queryForList(
                         "SELECT mt.seat_id " +
                                 "FROM member_tickets mt " +
                                 "LEFT JOIN member_orders mo ON mo.id = mt.order_id " +
                                 "WHERE mt.showtime_id = ? AND mt.show_start_at = ? " +
-                                "AND (mt.order_id IS NULL OR mo.status = 'PAID')",
+                                "AND (mt.order_id IS NULL OR mo.status = 'PAID' " +
+                                "OR (mo.status IN ('PENDING', 'FAILED') AND mo.created_at >= ?))",
                         String.class,
                         showtimeId,
-                        java.sql.Timestamp.from(showStartAt));
+                        java.sql.Timestamp.from(showStartAt),
+                        java.sql.Timestamp.from(holdThreshold));
                 for (String seatId : booked) {
                     if (seatId != null && !seatId.isBlank()) {
                         reservedLookup.put(seatId.trim(), Boolean.TRUE);

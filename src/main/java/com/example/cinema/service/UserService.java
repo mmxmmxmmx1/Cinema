@@ -71,6 +71,7 @@ public class UserService {
 
         String safeUsername = normalizeUsername(username);
         validateAccountName(safeUsername);
+        validatePassword(rawPassword);
 
         logger.info("開始註冊用戶: {}", safeUsername);
         try {
@@ -115,6 +116,7 @@ public class UserService {
 
         String safeUsername = normalizeUsername(username);
         validateAccountName(safeUsername);
+        validatePassword(rawPassword);
 
         logger.info("開始註冊員工: {}", safeUsername);
         try {
@@ -250,7 +252,8 @@ public class UserService {
         if (password == null || password.isBlank()) {
             throw new UserRegistrationException("密碼不可為空");
         }
-        String safe = password.trim();
+        // Keep raw input for validation so leading/trailing whitespace cannot bypass checks.
+        String safe = password;
         if (safe.length() < MIN_PASSWORD_LENGTH) {
             throw new UserRegistrationException("密碼長度至少 " + MIN_PASSWORD_LENGTH + " 碼");
         }
@@ -348,7 +351,7 @@ public class UserService {
     @Transactional
     public void mergeGuestWatchlistIntoUser(
             String username,
-            Collection<Long> movieIds) {
+            Collection<String> movieIds) {
         
         logger.debug("開始合併觀看清單，用戶: {}", username);
         
@@ -365,8 +368,10 @@ public class UserService {
         }
 
         // 去重並過濾空值
-        Set<Long> deduplicated = movieIds.stream()
+        Set<String> deduplicated = movieIds.stream()
                 .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
                 .collect(Collectors.toCollection(HashSet::new));
                 
         if (deduplicated.isEmpty()) {
@@ -375,11 +380,11 @@ public class UserService {
         }
 
         // 獲取用戶現有的觀看清單
-        Set<Long> existing = new HashSet<>();
+        Set<String> existing = new HashSet<>();
         try {
             existing = new HashSet<>(jdbcTemplate.queryForList(
                     "SELECT movie_id FROM user_watchlist WHERE user_id = ?",
-                    Long.class,
+                    String.class,
                     user.getId()));
             logger.debug("用戶 {} 現有 {} 部電影在觀看清單中", username, existing.size());
         } catch (DataAccessException ex) {
@@ -389,7 +394,7 @@ public class UserService {
 
         // 合併清單
         int addedCount = 0;
-        for (Long movieId : deduplicated) {
+        for (String movieId : deduplicated) {
             if (!existing.contains(movieId)) {
                 try {
                     jdbcTemplate.update(

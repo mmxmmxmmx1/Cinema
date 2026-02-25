@@ -73,18 +73,38 @@ find src/test/java -name '*Test.java' -o -name '*IntegrationTest.java'
 mvn test
 ```
 
+### 日常基線（不使用 Docker）
+```bash
+mvn -Dtest='*Test,!RealMySqlContainerIntegrationTest' test
+```
+
 ### 選配：瀏覽器 E2E（Playwright）
 預設不會啟用，避免每次本機測試都依賴瀏覽器執行環境。
 
+先一次性安裝 Chromium：
+
 ```bash
-mvn test -Dbrowser.e2e=true -Dtest=BrowserAuthE2EPlaywrightTest
+PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers \
+mvn -B -DskipTests test-compile dependency:build-classpath -Dmdep.outputFile=target/test.classpath
+
+CP="target/test-classes:target/classes:$(cat target/test.classpath)"
+PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers \
+java -cp "$CP" com.microsoft.playwright.CLI install chromium
+```
+
+再執行 E2E：
+
+```bash
+PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers \
+PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+mvn test -Djacoco.skip=true -Dbrowser.e2e=true -Dtest=BrowserAuthE2EPlaywrightTest
 ```
 
 ### 選配：真 MySQL 整合測試（Testcontainers）
 需要本機可用 Docker。預設不啟用。
 
 ```bash
-mvn test -Dmysql.it=true -Dtest=RealMySqlContainerIntegrationTest
+mvn test -Djacoco.skip=true -Dmysql.it=true -Dtest=RealMySqlContainerIntegrationTest
 ```
 
 ## Demo 帳號與資料庫操作 (MySQL)
@@ -181,9 +201,8 @@ ls target/surefire-reports
 
 ## 測試覆蓋率目標
 
-- **服務層**: > 80%
-- **控制器層**: > 70%
-- **整體覆蓋率**: > 75%
+- **CI 硬性門檻（JaCoCo）**: 整體 LINE 覆蓋率 >= 50%（以 `pom.xml` 設定為準）
+- **團隊目標值**: 服務層 > 80%、控制器層 > 70%、整體 > 75%（逐步提升）
 
 ## 測試最佳實踐
 

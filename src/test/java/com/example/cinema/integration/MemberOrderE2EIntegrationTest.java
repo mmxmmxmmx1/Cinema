@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
 import java.sql.Timestamp;
@@ -15,6 +14,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -52,6 +52,7 @@ class MemberOrderE2EIntegrationTest {
     private static final String MEMBER = "test123";
     private static final String MOVIE_ID = "mv-02";
     private static final String SHOWTIME_ID = "mv-02-st1";
+    private static final String ACTIVE_WINDOW_BASE_SHOWTIME_ID = "mv-02-st4";
     private static final String LATER_OTHER_AUDITORIUM_SHOWTIME_ID = "mv-02-st5";
 
     @Autowired
@@ -261,14 +262,14 @@ class MemberOrderE2EIntegrationTest {
     }
 
     @Test
-    @DisplayName("付款失敗後可在逾時前重新付款成功")
+    @DisplayName("付款失敗後仍保留鎖位，且可在逾時前重新付款成功")
     void shouldAllowRetryPaymentAfterFailure() {
         List<String> seats = pickAvailableSeats(1);
         OrderDetailResponse created = memberOrderService.createOrder(MEMBER, MOVIE_ID, SHOWTIME_ID, seats);
 
         OrderDetailResponse failed = memberOrderService.payOrder(MEMBER, created.orderId(), "FAILED");
         assertEquals("FAILED", failed.status());
-        assertEquals(0, countTicketsByOrder(created.orderId()));
+        assertEquals(1, countTicketsByOrder(created.orderId()));
 
         OrderDetailResponse paid = memberOrderService.payOrder(MEMBER, created.orderId(), "SUCCESS");
         assertEquals("PAID", paid.status());
@@ -347,10 +348,19 @@ class MemberOrderE2EIntegrationTest {
     }
 
     @Test
-    @DisplayName("逾時未付款訂單應自動失效並釋放座位")
+    @DisplayName("待付款訂單應先鎖位，逾時後自動失效並釋放座位")
     void shouldExpirePendingOrderAndReleaseSeats() throws Exception {
+        String rival = "lockrival";
+        jdbcTemplate.update(
+                "INSERT INTO members (nickname, password) VALUES (?, ?)",
+                rival,
+                "{noop}test123");
+
         List<String> seats = pickAvailableSeats(1);
         OrderDetailResponse created = memberOrderService.createOrder(MEMBER, MOVIE_ID, SHOWTIME_ID, seats);
+        assertThrows(TicketPurchaseConflictException.class,
+                () -> memberOrderService.createOrder(rival, MOVIE_ID, SHOWTIME_ID, seats));
+
         jdbcTemplate.update(
                 "UPDATE member_orders SET created_at = ? WHERE id = ?",
                 Timestamp.from(ZonedDateTime.of(2026, 2, 12, 7, 10, 0, 0, ZONE).toInstant()),
@@ -363,34 +373,81 @@ class MemberOrderE2EIntegrationTest {
         assertEquals("EXPIRED", expired.status());
         assertEquals(0, countTicketsByOrder(created.orderId()));
 
-        OrderDetailResponse retry = memberOrderService.createOrder(MEMBER, MOVIE_ID, SHOWTIME_ID, seats);
+        OrderDetailResponse retry = memberOrderService.createOrder(rival, MOVIE_ID, SHOWTIME_ID, seats);
         assertEquals("PENDING", retry.status());
     }
 
     @Test
-    @DisplayName("原場次結束後，應可改買其他影廳的後續場次")
-    void shouldAllowCrossAuditoriumPurchaseAfterCurrentShowEnded() throws Exception {
+    @DisplayName("會員可在同一天購買不同影廳場次")
+    void shouldAllowCrossAuditoriumPurchaseOnSameDay() throws Exception {
         List<String> firstShowSeats = pickAvailableSeats(SHOWTIME_ID, 4);
         OrderDetailResponse firstOrder = memberOrderService.createOrder(MEMBER, MOVIE_ID, SHOWTIME_ID, firstShowSeats);
         OrderDetailResponse firstPaid = memberOrderService.payOrder(MEMBER, firstOrder.orderId(), "SUCCESS");
         assertEquals("PAID", firstPaid.status());
 
         List<String> otherAuditoriumSeats = pickAvailableSeats(LATER_OTHER_AUDITORIUM_SHOWTIME_ID, 1);
-        assertThrows(TicketPurchaseRuleViolationException.class,
-                () -> memberOrderService.createOrder(MEMBER, MOVIE_ID, LATER_OTHER_AUDITORIUM_SHOWTIME_ID,
-                        otherAuditoriumSeats));
-
-        // mv-02-st1 starts at 08:50 and lasts 180 minutes, so it ends at 11:50.
-        setTestClock(ZonedDateTime.of(2026, 2, 12, 12, 0, 0, 0, ZONE).toInstant());
-
         OrderDetailResponse secondOrder = memberOrderService.createOrder(
                 MEMBER, MOVIE_ID, LATER_OTHER_AUDITORIUM_SHOWTIME_ID, otherAuditoriumSeats);
         assertEquals("PENDING", secondOrder.status());
+        OrderDetailResponse secondPaid = memberOrderService.payOrder(MEMBER, secondOrder.orderId(), "SUCCESS");
+        assertEquals("PAID", secondPaid.status());
     }
 
     @Test
-    @DisplayName("同座位並發付款時只能成功一筆")
-    void shouldAllowOnlyOneSuccessfulPaymentUnderConcurrentSeatRace() throws Exception {
+    @DisplayName("同會員同一場次最多 4 張，且跨日不互相影響")
+    void shouldEnforcePerScreeningCapPerMemberWithoutCrossDayInterference() throws Exception {
+        setTestClock(ZonedDateTime.of(2026, 2, 12, 16, 0, 0, 0, ZONE).toInstant());
+        List<String> historicalSeats = pickAvailableSeats(ACTIVE_WINDOW_BASE_SHOWTIME_ID, 4);
+        OrderDetailResponse historicalOrder = memberOrderService.createOrder(
+                MEMBER, MOVIE_ID, ACTIVE_WINDOW_BASE_SHOWTIME_ID, historicalSeats);
+        OrderDetailResponse historicalPaid = memberOrderService.payOrder(MEMBER, historicalOrder.orderId(), "SUCCESS");
+        assertEquals("PAID", historicalPaid.status());
+
+        List<String> historicalExtraSeat = pickAvailableSeats(ACTIVE_WINDOW_BASE_SHOWTIME_ID, 1);
+        assertThrows(TicketPurchaseRuleViolationException.class,
+                () -> memberOrderService.createOrder(
+                        MEMBER, MOVIE_ID, ACTIVE_WINDOW_BASE_SHOWTIME_ID, historicalExtraSeat));
+
+        setTestClock(ZonedDateTime.of(2026, 2, 25, 16, 0, 0, 0, ZONE).toInstant());
+        List<String> todaySeats = pickAvailableSeats(ACTIVE_WINDOW_BASE_SHOWTIME_ID, 4);
+        OrderDetailResponse todayOrder = memberOrderService.createOrder(
+                MEMBER, MOVIE_ID, ACTIVE_WINDOW_BASE_SHOWTIME_ID, todaySeats);
+        OrderDetailResponse todayPaid = memberOrderService.payOrder(MEMBER, todayOrder.orderId(), "SUCCESS");
+        assertEquals("PAID", todayPaid.status());
+
+        List<String> todayExtraSeat = pickAvailableSeats(ACTIVE_WINDOW_BASE_SHOWTIME_ID, 1);
+        assertThrows(TicketPurchaseRuleViolationException.class,
+                () -> memberOrderService.createOrder(
+                        MEMBER, MOVIE_ID, ACTIVE_WINDOW_BASE_SHOWTIME_ID, todayExtraSeat));
+    }
+
+    @Test
+    @DisplayName("每個影廳都應套用同場次每會員 4 張上限")
+    void shouldApplyPerScreeningCapAcrossAllAuditoriums() {
+        Map<String, String> showtimeByAuditorium = Map.of(
+                "1號廳", "mv-02-st1",
+                "2號廳", "mv-02-st2",
+                "3號廳", "mv-02-st3");
+
+        for (Map.Entry<String, String> entry : showtimeByAuditorium.entrySet()) {
+            String auditorium = entry.getKey();
+            String showtimeId = entry.getValue();
+
+            List<String> seats = pickAvailableSeats(showtimeId, 4);
+            OrderDetailResponse order = memberOrderService.createOrder(MEMBER, MOVIE_ID, showtimeId, seats);
+            OrderDetailResponse paid = memberOrderService.payOrder(MEMBER, order.orderId(), "SUCCESS");
+            assertEquals("PAID", paid.status(), auditorium + " 應可完成首筆 4 張付款");
+
+            List<String> extraSeat = pickAvailableSeats(showtimeId, 1);
+            assertThrows(TicketPurchaseRuleViolationException.class,
+                    () -> memberOrderService.createOrder(MEMBER, MOVIE_ID, showtimeId, extraSeat),
+                    auditorium + " 應阻擋同會員同場次第 5 張");
+        }
+    }
+
+    @Test
+    @DisplayName("同座位在下單階段即鎖位，第二筆下單應被拒絕")
+    void shouldRejectSecondOrderWhenSeatAlreadyLocked() {
         String rival = "rival001";
         jdbcTemplate.update(
                 "INSERT INTO members (nickname, password) VALUES (?, ?)",
@@ -399,29 +456,16 @@ class MemberOrderE2EIntegrationTest {
 
         String seat = pickAvailableSeats(1).get(0);
         OrderDetailResponse firstOrder = memberOrderService.createOrder(MEMBER, MOVIE_ID, SHOWTIME_ID, List.of(seat));
-        OrderDetailResponse secondOrder = memberOrderService.createOrder(rival, MOVIE_ID, SHOWTIME_ID, List.of(seat));
+        assertThrows(TicketPurchaseConflictException.class,
+                () -> memberOrderService.createOrder(rival, MOVIE_ID, SHOWTIME_ID, List.of(seat)));
 
-        CountDownLatch startLatch = new CountDownLatch(1);
-        ExecutorService executor = Executors.newFixedThreadPool(2);
-        try {
-            Future<String> firstFuture = executor.submit(payConcurrently(MEMBER, firstOrder.orderId(), startLatch));
-            Future<String> secondFuture = executor.submit(payConcurrently(rival, secondOrder.orderId(), startLatch));
-            startLatch.countDown();
-
-            String firstResult = firstFuture.get(10, TimeUnit.SECONDS);
-            String secondResult = secondFuture.get(10, TimeUnit.SECONDS);
-            int paidCount = ("PAID".equals(firstResult) ? 1 : 0) + ("PAID".equals(secondResult) ? 1 : 0);
-
-            assertEquals(1, paidCount);
-            assertEquals(1, countTicketsByShowtimeSeat(SHOWTIME_ID, seat));
-            assertTrue(firstResult.equals("PAID") || secondResult.equals("PAID"));
-        } finally {
-            executor.shutdownNow();
-        }
+        OrderDetailResponse paid = memberOrderService.payOrder(MEMBER, firstOrder.orderId(), "SUCCESS");
+        assertEquals("PAID", paid.status());
+        assertEquals(1, countTicketsByShowtimeSeat(SHOWTIME_ID, seat));
     }
 
     @Test
-    @DisplayName("10 名會員併發搶同一座位時仍不得超賣")
+    @DisplayName("10 名會員併發搶同一座位時，建單階段也不得超賣")
     void shouldPreventOversellUnderTenConcurrentMembers() throws Exception {
         String seat = pickAvailableSeats(1).get(0);
         int contenders = 10;
@@ -436,20 +480,31 @@ class MemberOrderE2EIntegrationTest {
                         "INSERT INTO members (nickname, password) VALUES (?, ?)",
                         member,
                         "{noop}test123");
-                OrderDetailResponse order = memberOrderService.createOrder(member, MOVIE_ID, SHOWTIME_ID, List.of(seat));
-                futures[i] = executor.submit(payConcurrently(member, order.orderId(), startLatch));
+                futures[i] = executor.submit(() -> {
+                    startLatch.await(5, TimeUnit.SECONDS);
+                    try {
+                        OrderDetailResponse created = memberOrderService.createOrder(
+                                member,
+                                MOVIE_ID,
+                                SHOWTIME_ID,
+                                List.of(seat));
+                        return created.status();
+                    } catch (TicketPurchaseConflictException | TicketPurchaseRuleViolationException ex) {
+                        return "REJECTED";
+                    }
+                });
             }
 
             startLatch.countDown();
-            int paidCount = 0;
+            int pendingCount = 0;
             for (Future<String> future : futures) {
                 String result = future.get(15, TimeUnit.SECONDS);
-                if ("PAID".equals(result)) {
-                    paidCount++;
+                if ("PENDING".equals(result)) {
+                    pendingCount++;
                 }
             }
 
-            assertEquals(1, paidCount);
+            assertEquals(1, pendingCount);
             assertEquals(1, countTicketsByShowtimeSeat(SHOWTIME_ID, seat));
         } finally {
             executor.shutdownNow();
