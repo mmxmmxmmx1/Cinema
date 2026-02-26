@@ -1,5 +1,7 @@
 # Cinema (Spring Boot Side Project)
 
+最後修改日期：`2026-02-26`
+
 電影院訂票 side project，技術棧為 Spring Boot + Thymeleaf + MySQL。
 
 ## 專案現況（以目前程式碼為準）
@@ -43,18 +45,32 @@ Flyway Migration
 說明：
 - 專案沒有用 Maven Enforcer 強制版本；以上為目前實測可運作範圍。
 
-## 2. 啟動方式（非 Docker）
+## 2. 啟動方式
 
 重要：
 - 預設 profile 是 `prod`（`src/main/resources/application.properties`）。
 - 本機開發請明確設定 `SPRING_PROFILES_ACTIVE=dev`（建議使用 `.env`）。
 
-建議流程：
+啟動前必檢查（避免 `Communications link failure`）：
 
 ```bash
 cp .env.example .env
 # 編輯 .env 內 DB 參數（必要）
 
+set -a; . ./.env; set +a
+mysql --connect-timeout=5 \
+  -h 127.0.0.1 -P 3306 \
+  -u "$DB_USERNAME" "-p$DB_PASSWORD" \
+  -D cinema \
+  -e "SELECT 1 AS ok;"
+```
+
+若上面 SQL 無法回傳 `ok=1`，先啟動/修復本機 MySQL，再執行應用程式。
+若在受限沙箱/遠端受管環境執行命令，也可能因環境禁止本機 TCP 連線而失敗（此時不代表 MySQL 一定故障）。
+
+啟動：
+
+```bash
 mvn spring-boot:run
 ```
 
@@ -157,25 +173,27 @@ Flyway migration 位置：
 
 ## 8. 測試
 
-執行預設測試（不含條件式測試）：
+### 基線測試（不需 Docker）
+
+執行：
 
 ```bash
 mvn clean test
 ```
 
-說明：
+結果判讀：
 - 會跑一般單元與整合測試。
-- 條件式測試（Playwright、真 MySQL Testcontainers）若未開旗標會顯示 `skipped`。
+- 條件式測試（Playwright）若未開旗標會顯示 `skipped`（正常）。
+- 若看到 `Communications link failure`，表示本機 MySQL 未啟動或連線參數錯誤。
+- 若在受限沙箱/遠端受管環境跑測試，也可能是環境權限阻擋 socket，請回到本機終端機再驗證一次。
 
-日常開發（不使用 Docker）建議基線：
+日常開發建議：
 
 ```bash
-mvn -Dtest='*Test,!RealMySqlContainerIntegrationTest' test
+mvn clean test
 ```
 
-### 條件式測試開關
-
-Playwright 瀏覽器 E2E：
+### 條件式測試（Playwright E2E）
 
 先安裝 Chromium（一次性）：
 
@@ -196,23 +214,22 @@ PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
 mvn -Djacoco.skip=true -Dbrowser.e2e=true -Dtest=BrowserAuthE2EPlaywrightTest test
 ```
 
-真 MySQL（Testcontainers）整合測試：
-
-```bash
-mvn -Djacoco.skip=true -Dmysql.it=true -Dtest=RealMySqlContainerIntegrationTest test
-```
-
 必要條件：
 - Playwright 首次會下載瀏覽器到 `.playwright-browsers/`（`.gitignore` 已忽略）。
 - 需可連線 `cdn.playwright.dev`（若公司網路限制需設定代理）。
-- Linux 若缺動態函式庫可安裝：
+- Linux 需具備 Chromium 相關動態函式庫（不同發行版套件名會不同）。
+- Ubuntu 24.04 / Linux Mint 22 可用：
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y libicu74 libvpx9
 ```
 
-- 真 MySQL Testcontainers 需要可用的 Docker daemon（`/var/run/docker.sock`）；若不可用，該測試會被跳過。
+- 套件名不確定時可先查詢：
+
+```bash
+apt-cache search '^libicu|^libvpx'
+```
 
 ## 9. CI
 
@@ -242,24 +259,7 @@ DB_PASSWORD='' \
 注意：
 - `reset-dev-demo-data.sh` 目前只會從 `DB_URL` 解析資料庫名稱，連線本機預設 MySQL client（未使用 `DB_URL` 的 host/port）。
 
-## 11. Docker 本機啟動（可選）
-
-前置條件：
-- 已安裝 Docker Engine 與 Docker Compose。
-- Docker daemon 已啟動。
-- 本機 `8080` / `3306` 埠未被其他服務占用。
-
-```bash
-docker compose up --build
-```
-
-啟動後：
-- App：`http://localhost:8080`
-- MySQL：`localhost:3306`（`/`）
-
-若本機沒有 Docker（例如 `docker: command not found`），請使用上方「非 Docker」流程。
-
-## 12. 補充文件（已提交）
+## 11. 補充文件（已提交）
 
 - 架構說明：`docs/architecture.md`
 - Demo 劇本：`docs/demo-script.md`

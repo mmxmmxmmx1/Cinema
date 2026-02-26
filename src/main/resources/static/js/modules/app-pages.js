@@ -101,7 +101,7 @@ const MovieDetailPage = {
                   <div class="showtime-meta">
                     <strong>{{ showtime.startTime }}</strong>
                     <span>{{ showtime.durationMinutes }} 分鐘</span>
-                    <span>{{ showtime.locationName ? showtime.locationName + ' · ' + showtime.auditorium : showtime.auditorium }}</span>
+                    <span>{{ showtime.auditorium }}</span>
                   </div>
                   <router-link class="primary-link" :to="'/movies/' + movie.id + '/showtimes/' + showtime.id">選擇座位</router-link>
                 </li>
@@ -145,7 +145,7 @@ const SeatSelectionPage = {
                 <img :src="movie.posterUrl" :alt="movie.title" class="movie-poster" loading="eager" decoding="async" fetchpriority="high" />
                 <div class="movie-info">
                   <h2>{{ movie.title }}</h2>
-                  <p>{{ details.showtime.startTime }} · {{ details.showtime.locationName ? details.showtime.locationName + ' · ' : '' }}{{ details.showtime.auditorium }}</p>
+                  <p>{{ details.showtime.startTime }} · {{ details.showtime.auditorium }}</p>
                   <p>{{ details.showtime.durationMinutes }} 分鐘</p>
                 </div>
               </div>
@@ -324,7 +324,7 @@ const CheckoutPage = {
             <div>
               <h2>結帳</h2>
               <p><strong>電影：</strong>{{ movie.title }}</p>
-              <p><strong>場次：</strong>{{ details.showtime.startTime }} · {{ details.showtime.locationName ? details.showtime.locationName + ' · ' : '' }}{{ details.showtime.auditorium }}</p>
+              <p><strong>場次：</strong>{{ details.showtime.startTime }} · {{ details.showtime.auditorium }}</p>
               <p><strong>座位：</strong>{{ seatIds.join(', ') }}</p>
               <p><strong>張數：</strong>{{ seatIds.length }}</p>
               <p><strong>票價：</strong>{{ unitPrice }} / 張</p>

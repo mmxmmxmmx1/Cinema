@@ -31,11 +31,6 @@ public class MovieController {
         return movieService.getMovies();
     }
 
-    @GetMapping("/locations")
-    public List<MovieService.CinemaLocationItem> getLocations() {
-        return movieService.listCinemaLocations();
-    }
-
     @GetMapping("/{movieId}")
     public ResponseEntity<Movie> getMovie(@PathVariable String movieId) {
         return movieService.getMovieWithUpcomingShowtimes(movieId)

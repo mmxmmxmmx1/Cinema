@@ -40,17 +40,14 @@ class EmployeeShowtimeAdminControllerTest {
     void shouldRenderShowtimeAdminPage() throws Exception {
         when(movieService.listCatalogItems()).thenReturn(List.of(
                 new MovieService.MovieCatalogItem("mv-01", "測試電影")));
-        when(movieService.listCinemaLocations()).thenReturn(List.of(
-                new MovieService.CinemaLocationItem("taipei-main", "台北信義館", "台北", 10)));
         when(movieService.listConfiguredShowtimes("mv-01")).thenReturn(List.of(
-                new Showtime("mv-01-st1", "10:00", 120, "1號廳", "taipei-main", "台北信義館")));
+                new Showtime("mv-01-st1", "10:00", 120, "1號廳")));
 
         mockMvc.perform(get("/employee/admin/showtimes"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin-showtimes"))
                 .andExpect(model().attributeExists("movies"))
-                .andExpect(model().attributeExists("showtimes"))
-                .andExpect(model().attributeExists("locations"));
+                .andExpect(model().attributeExists("showtimes"));
     }
 
     @Test
@@ -64,8 +61,7 @@ class EmployeeShowtimeAdminControllerTest {
                         .param("showtimeId", "mv-01-st9")
                         .param("startTime", "22:20")
                         .param("durationMinutes", "130")
-                        .param("auditorium", "2號廳")
-                        .param("locationCode", "taipei-main"))
+                        .param("auditorium", "2號廳"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(view().name("redirect:/employee/admin/showtimes?movieId=mv-01"));
     }

@@ -52,7 +52,8 @@ public class WebConfig implements WebMvcConfigurer {
                             if (requestedResource.exists() && requestedResource.isReadable()) {
                                 return requestedResource;
                             }
-                            // Only fallback to SPA entry for known client routes.
+                            // Do not fallback SPA entry for protected deep links.
+                            // Protected routes are handled by SpaRouteGuardController to enforce session checks.
                             // Unknown paths should keep normal 404 behavior instead of always returning index.html.
                             if (isSpaClientRoute(p)) {
                                 return new ClassPathResource("/static/index.html");
@@ -63,22 +64,9 @@ public class WebConfig implements WebMvcConfigurer {
                     }
 
                     private boolean isSpaClientRoute(String path) {
-                        if (path == null) {
-                            return false;
-                        }
-                        String normalized = path.trim();
-                        if (normalized.isEmpty() || "index.html".equals(normalized)) {
-                            return true;
-                        }
-                        if (normalized.contains(".")) {
-                            return false;
-                        }
-                        return normalized.equals("movies")
-                                || normalized.startsWith("movies/")
-                                || normalized.equals("checkout")
-                                || normalized.startsWith("checkout/")
-                                || normalized.equals("orders")
-                                || normalized.startsWith("orders/");
+                        // Keep explicit extension point for future public SPA routes.
+                        // Current policy: no anonymous deep-link fallback from resource handler.
+                        return false;
                     }
                 });
     }

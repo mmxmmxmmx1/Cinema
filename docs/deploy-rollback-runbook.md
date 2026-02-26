@@ -6,7 +6,8 @@
 2. 執行：
    - `mvn clean verify`
 3. 備份資料庫：
-   - `DB_USERNAME=... DB_PASSWORD=... ./scripts/mysql-backup.sh`
+   - `DB_USERNAME=... DB_PASSWORD=... BACKUP_DIR=... ./scripts/mysql-backup.sh`
+   - 備份/還原細節：`docs/database-backup-restore-runbook.md`
 4. 確認必要環境變數：
    - `SPRING_PROFILES_ACTIVE=prod`
    - `DB_URL`
@@ -29,7 +30,7 @@
 1. 停用新版應用。
 2. 切回前一版程式碼（tag 或 commit）。
 3. 如需資料回滾，還原部署前備份：
-   - `DB_USERNAME=... DB_PASSWORD=... ./scripts/mysql-restore.sh backups/xxx.sql`
+   - `DB_USERNAME=... DB_PASSWORD=... CONFIRM_RESTORE=yes ./scripts/mysql-restore.sh backups/xxx.sql.gz`
 4. 重新啟動前一版並跑 smoke check。
 
 ## 4. Flyway 例外處理

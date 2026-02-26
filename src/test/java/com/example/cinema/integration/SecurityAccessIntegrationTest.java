@@ -7,7 +7,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.forwardedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -135,7 +135,10 @@ class SecurityAccessIntegrationTest {
     @Test
     @DisplayName("SPA 路徑應套用 SPA CSP（包含 unsafe-eval）")
     void shouldApplySpaCspOnSpaRoutes() throws Exception {
-        mockMvc.perform(get("/movies/mv-01"))
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("memberAuthenticated", true);
+
+        mockMvc.perform(get("/movies/mv-01").session(session))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Security-Policy",
                         Matchers.containsString("script-src 'self' 'unsafe-eval'")));
@@ -159,23 +162,67 @@ class SecurityAccessIntegrationTest {
     }
 
     @Test
-    @DisplayName("未登入直接開啟 checkout 深連結應回傳 SPA 入口頁")
-    void shouldServeSpaEntryForAnonymousCheckoutDeepLink() throws Exception {
-        mockMvc.perform(get("/checkout/mv-01/showtimes/mv-01-st1"))
-                .andExpect(status().isOk())
-                .andExpect(header().string("Content-Type", Matchers.containsString("text/html")))
-                .andExpect(content().string(Matchers.containsString("<div id=\"root\"></div>")))
-                .andExpect(content().string(Matchers.containsString("/js/modules/vendor-loader.js")));
+    @DisplayName("不應提供電影院地區清單 API")
+    void shouldNotExposeCinemaLocationsApi() throws Exception {
+        mockMvc.perform(get("/api/movies/locations"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    @DisplayName("未登入直接開啟 orders 深連結應回傳 SPA 入口頁")
-    void shouldServeSpaEntryForAnonymousOrdersDeepLink() throws Exception {
+    @DisplayName("未登入直接開啟 movies 深連結應導回首頁")
+    void shouldRedirectAnonymousMoviesDeepLinkToHome() throws Exception {
+        mockMvc.perform(get("/movies/mv-01"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/"));
+    }
+
+    @Test
+    @DisplayName("未登入直接開啟 checkout 深連結應導回首頁")
+    void shouldRedirectAnonymousCheckoutDeepLinkToHome() throws Exception {
+        mockMvc.perform(get("/checkout/mv-01/showtimes/mv-01-st1"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/"));
+    }
+
+    @Test
+    @DisplayName("未登入直接開啟 orders 深連結應導回首頁")
+    void shouldRedirectAnonymousOrdersDeepLinkToHome() throws Exception {
         mockMvc.perform(get("/orders/123"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/"));
+    }
+
+    @Test
+    @DisplayName("會員已登入時可開啟 movies 深連結並載入 SPA 入口頁")
+    void shouldServeSpaEntryForMemberMoviesDeepLink() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("memberAuthenticated", true);
+
+        mockMvc.perform(get("/movies/mv-01").session(session))
                 .andExpect(status().isOk())
-                .andExpect(header().string("Content-Type", Matchers.containsString("text/html")))
-                .andExpect(content().string(Matchers.containsString("<div id=\"root\"></div>")))
-                .andExpect(content().string(Matchers.containsString("/js/modules/vendor-loader.js")));
+                .andExpect(forwardedUrl("/index.html"));
+    }
+
+    @Test
+    @DisplayName("會員已登入時可開啟 checkout 深連結並載入 SPA 入口頁")
+    void shouldServeSpaEntryForMemberCheckoutDeepLink() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("memberAuthenticated", true);
+
+        mockMvc.perform(get("/checkout/mv-01/showtimes/mv-01-st1").session(session))
+                .andExpect(status().isOk())
+                .andExpect(forwardedUrl("/index.html"));
+    }
+
+    @Test
+    @DisplayName("會員已登入時可開啟 orders 深連結並載入 SPA 入口頁")
+    void shouldServeSpaEntryForMemberOrdersDeepLink() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("memberAuthenticated", true);
+
+        mockMvc.perform(get("/orders/123").session(session))
+                .andExpect(status().isOk())
+                .andExpect(forwardedUrl("/index.html"));
     }
 
     @Test

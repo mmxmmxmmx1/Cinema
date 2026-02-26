@@ -418,6 +418,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/health").permitAll()
                 .requestMatchers("/api/guest/**", "/api/movies/**").permitAll()
                 .requestMatchers("/api/v1/guest/**", "/api/v1/movies/**").permitAll()
+                // SPA 深連結先放行到控制器層；其中 movies/checkout/orders 會在
+                // SpaRouteGuardController 依會員 session 決定導回首頁或載入入口頁。
                 .requestMatchers(SPA_CLIENT_ROUTE_PATTERNS).permitAll()
                 .anyRequest().authenticated())
                 // Only ignore CSRF for guest APIs used by the SPA without a token.

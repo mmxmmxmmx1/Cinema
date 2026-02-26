@@ -119,6 +119,14 @@ class BrowserAuthE2EPlaywrightTest {
     }
 
     @Test
+    @DisplayName("未登入直接開啟 movies 深連結應導回首頁")
+    void anonymousMoviesDeepLinkShouldRedirectHome() {
+        navigate(baseUrl("/movies/mv-01"));
+        waitForPath("/");
+        assertEquals("/", currentPath());
+    }
+
+    @Test
     @DisplayName("未登入直接開啟 checkout 深連結應導回首頁")
     void anonymousCheckoutDeepLinkShouldRedirectHome() {
         navigate(baseUrl("/checkout/mv-01/showtimes/mv-01-st1"));

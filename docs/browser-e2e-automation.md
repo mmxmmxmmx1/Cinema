@@ -27,7 +27,7 @@ mvn -Dtest=MemberOrderWebE2EIntegrationTest,SecurityAccessIntegrationTest,HomeUi
 - `BrowserAuthE2EPlaywrightTest`
   - 會員登入/登出
   - 員工登入/登出
-  - 匿名使用者直接開啟 `checkout/orders` 深連結導回首頁
+  - 匿名使用者直接開啟 `movies/checkout/orders` 深連結導回首頁
 
 執行方式（不使用 Docker）：
 

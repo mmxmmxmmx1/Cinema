@@ -36,7 +36,6 @@ public class EmployeeShowtimeAdminController {
         model.addAttribute("movies", movies);
         model.addAttribute("selectedMovieId", selectedMovieId);
         model.addAttribute("showtimes", showtimes);
-        model.addAttribute("locations", movieService.listCinemaLocations());
         return "admin-showtimes";
     }
 
@@ -48,7 +47,6 @@ public class EmployeeShowtimeAdminController {
             @RequestParam("startTime") String startTime,
             @RequestParam("durationMinutes") int durationMinutes,
             @RequestParam("auditorium") String auditorium,
-            @RequestParam(value = "locationCode", required = false) String locationCode,
             RedirectAttributes redirectAttributes) {
         String operator = authentication == null ? "unknown" : authentication.getName();
         try {
@@ -58,7 +56,6 @@ public class EmployeeShowtimeAdminController {
                     startTime,
                     durationMinutes,
                     auditorium,
-                    locationCode,
                     operator);
             redirectAttributes.addFlashAttribute("success", "場次已儲存：" + showtimeId);
         } catch (Exception ex) {
