@@ -1,6 +1,6 @@
 # Cinema (Spring Boot Side Project)
 
-最後修改日期：`2026-02-26`
+最後修改日期：`2026-02-28`
 
 電影院訂票 side project，技術棧為 Spring Boot + Thymeleaf + MySQL。
 
@@ -183,9 +183,12 @@ mvn clean test
 
 結果判讀：
 - 會跑一般單元與整合測試。
+- 基線測試使用 `test` profile + H2（`src/test/resources/application-test.properties`），不需要本機 MySQL。
 - 條件式測試（Playwright）若未開旗標會顯示 `skipped`（正常）。
 - 若看到 `Communications link failure`，表示本機 MySQL 未啟動或連線參數錯誤。
 - 若在受限沙箱/遠端受管環境跑測試，也可能是環境權限阻擋 socket，請回到本機終端機再驗證一次。
+
+完整測試矩陣、分層清單與常見測試指令，請參考 `TEST_README.md`。
 
 日常開發建議：
 
@@ -262,6 +265,7 @@ DB_PASSWORD='' \
 ## 11. 補充文件（已提交）
 
 - 架構說明：`docs/architecture.md`
+- 測試操作手冊：`TEST_README.md`
 - Demo 劇本：`docs/demo-script.md`
 - Flyway 規範：`docs/flyway-migration-rules.md`
 - 真實環境驗證清單：`docs/production-validation-checklist.md`
@@ -273,3 +277,21 @@ DB_PASSWORD='' \
 - 圖片素材規範：`docs/image-assets-policy.md`
 - 專案交接清單：`docs/handover-checklist.md`
 - 功能完成度矩陣：`docs/feature-matrix.md`
+
+## 12. 作品定位與已知限制
+
+此專案定位為可展示完整業務流程與工程能力的「訂票系統作品（最小可行產品，Minimum Viable Product）」。
+
+目前已完成：
+- 會員/員工雙身份登入與授權
+- 訂票、鎖位、付款（mock）、取消、通知、點數、後台管理
+- 核心測試與 CI 驗證流程
+
+目前刻意未納入（非缺陷、屬範圍界定）：
+- 真實第三方金流串接（目前為 `mock`）
+- Email 驗證與簡訊/電話 OTP 驗證（目前為站內流程）
+
+若要進入正式商轉，建議下一步：
+- 串接正式金流與退款對帳機制
+- 補齊 Email/SMS OTP 與帳號風險控管
+- 強化生產環境監控、告警、備援與資安政策

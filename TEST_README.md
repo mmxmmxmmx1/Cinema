@@ -1,85 +1,80 @@
 # 電影院系統測試文檔
 
-## 測試概述
+最後修改日期：`2026-02-28`
 
-本專案包含完整的測試單元，涵蓋服務層、控制器層和整合測試。
+## 1. 文件定位
 
-## 測試結構
+- `README.md`：專案啟動、環境設定、功能規則總覽
+- `TEST_README.md`（本文件）：測試分層、執行方式、測試資料與故障排查
+- 最終以程式碼與 CI 實際執行結果為準
 
-目前測試分為三層：
+## 2. 測試分層與清單
+
+目前測試主要分為三層：
 - `src/test/java/com/example/cinema/service`：服務層單元測試
 - `src/test/java/com/example/cinema/controller`：控制器測試
-- `src/test/java/com/example/cinema/integration`：流程整合測試
+- `src/test/java/com/example/cinema/integration`：流程整合測試（含條件式瀏覽器 E2E）
 
-可用下列指令查看當前測試檔案清單：
+查詢完整測試類清單：
+
 ```bash
-find src/test/java -name '*Test.java' -o -name '*IntegrationTest.java'
+find src/test/java -type f \( -name '*Test.java' -o -name '*IntegrationTest.java' -o -name '*IT.java' \) | sort
 ```
 
-## 測試覆蓋範圍
+查詢目前總測試數（依最新 surefire 報告）：
 
-### 1. MovieServiceTest (電影服務測試)
-- ✅ 獲取所有電影列表
-- ✅ 根據 ID 獲取特定電影
-- ✅ 處理不存在的電影 ID
-- ✅ 獲取電影場次信息
-- ✅ 處理不存在的場次 ID
-- ✅ 獲取座位佈局
-- ✅ 獲取場次詳細信息
-- ✅ 驗證座位佈局的一致性
-- ✅ 驗證已預訂和可用座位
-
-測試案例會隨功能迭代增加，請以 CI 執行結果為準。
-
-### 2. SessionServiceTest (會話服務測試)
-- ✅ 獲取訪客觀看清單鍵
-- ✅ 驗證未認證會話
-- ✅ 驗證已認證會話
-- ✅ 不同領域的獨立認證
-- ✅ 記錄登入嘗試
-- ✅ 記錄多次登入嘗試
-- ✅ 清除登入嘗試記錄
-- ✅ 驗證鎖定時間
-- ✅ 不同領域的獨立嘗試計數
-
-測試案例會隨功能迭代增加，請以 CI 執行結果為準。
-
-### 3. MemberApiControllerTest (會員 API 控制器測試)
-- ✅ 添加電影到訪客觀看清單
-- ✅ 獲取訪客觀看清單
-- ✅ 處理空觀看清單
-- ✅ 已認證會員獲取摘要信息
-- ✅ 未認證用戶訪問限制
-- ✅ 添加多部電影到觀看清單
-
-測試案例會隨功能迭代增加，請以 CI 執行結果為準。
-
-### 4. MovieIntegrationTest (電影功能整合測試)
-- ✅ 獲取所有電影列表
-- ✅ 完整訂票流程測試
-- ✅ 驗證所有電影的場次信息
-- ✅ 驗證座位佈局一致性
-- ✅ 處理無效電影 ID
-- ✅ 處理無效場次 ID
-- ✅ 驗證海報 URL
-- ✅ 驗證電影描述
-
-測試案例會隨功能迭代增加，請以 CI 執行結果為準。
-
-## 運行測試
-
-### 運行所有測試
 ```bash
-mvn test
+total_tests=$(grep -Rho 'tests="[0-9]\+"' target/surefire-reports/*.xml | grep -Eo '[0-9]+' | awk '{sum+=$1} END {print sum+0}')
+echo "$total_tests"
 ```
 
-### 日常基線
+## 3. 覆蓋範圍（代表項目）
+
+本節為代表性盤點，不是完整清單；完整內容請用上方命令即時查詢。
+
+### 3.1 服務層
+
+- `MovieServiceTest`
+- `SessionServiceTest`
+- `LoginAttemptServiceTest`
+- `ApiRateLimitServiceTest`
+- `UserServiceTest`
+
+### 3.2 控制器層
+
+- `MemberApiControllerTest`
+- `MemberOrderControllerRateLimitTest`
+- `MemberOrdersPageControllerTest`
+- `MemberPasswordControllerTest`
+- `EmployeeAdminControllerTest`
+- `EmployeeShowtimeAdminControllerTest`
+- `EmployeeMovieAdminControllerTest`
+
+### 3.3 整合層
+
+- `MovieIntegrationTest`
+- `MemberOrderE2EIntegrationTest`
+- `MemberOrderWebE2EIntegrationTest`
+- `OperationsWorkflowIntegrationTest`
+- `SecurityAccessIntegrationTest`
+- `ShowtimeAdminIntegrationTest`
+- `HomeUiContractTest`
+- `BrowserAuthE2EPlaywrightTest`（條件式啟用）
+
+## 4. 執行測試
+
+### 4.1 基線測試（建議日常）
+
 ```bash
 mvn clean test
 ```
 
-### 選配：瀏覽器 E2E（Playwright）
-預設不會啟用，避免每次本機測試都依賴瀏覽器執行環境。
+說明：
+- 會跑單元 + 控制器 + 整合測試。
+- `BrowserAuthE2EPlaywrightTest` 預設不啟用（未帶 `-Dbrowser.e2e=true` 時會 `skipped`）。
+- 基線測試走 `@ActiveProfiles("test")` + `src/test/resources/application-test.properties`（H2 in-memory），不需要本機 MySQL。
+
+### 4.2 條件式瀏覽器 E2E（Playwright）
 
 先一次性安裝 Chromium：
 
@@ -92,29 +87,48 @@ PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers \
 java -cp "$CP" com.microsoft.playwright.CLI install chromium
 ```
 
-再執行 E2E：
+執行瀏覽器 E2E：
 
 ```bash
 PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers \
 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
-mvn test -Djacoco.skip=true -Dbrowser.e2e=true -Dtest=BrowserAuthE2EPlaywrightTest
+mvn -Djacoco.skip=true -Dbrowser.e2e=true -Dtest=BrowserAuthE2EPlaywrightTest test
 ```
 
-## Demo 帳號與資料庫操作 (MySQL)
+必要條件：
+- 可連線 `cdn.playwright.dev`
+- Linux 需具備 Chromium 執行所需動態函式庫
+- `.playwright-browsers/` 已在 `.gitignore`，不會上傳 Git
 
-### 環境變數 (建議)
-正式環境不要把資料庫連線資訊寫死在專案內，建議用環境變數提供：
+### 4.3 只跑特定測試類（精準模式）
 
-- `SPRING_PROFILES_ACTIVE=dev` (本機) 或 `SPRING_PROFILES_ACTIVE=prod` (上線)
-- `DB_URL`
-- `DB_USERNAME`
-- `DB_PASSWORD`
+只跑單元/控制器代表測試：
 
-範例可參考專案根目錄的 `.env.example`。
+```bash
+mvn test -Dtest=MovieServiceTest,SessionServiceTest,ApiRateLimitServiceTest,MemberApiControllerTest,MemberOrdersPageControllerTest
+```
 
-### 目前預設測試帳號 (members 與 employee 兩邊同步)
-以下帳號在 `members` 與 `employee` 兩張表都存在，且密碼 = 帳號（bcrypt 雜湊存放）。
+只跑整合代表測試（不含瀏覽器 E2E）：
 
+```bash
+mvn test -Dtest=MovieIntegrationTest,OperationsWorkflowIntegrationTest,SecurityAccessIntegrationTest,MemberOrderE2EIntegrationTest,ShowtimeAdminIntegrationTest
+```
+
+說明：
+- 專案目前未拆分成 surefire/failsafe 雙階段；若要自訂「只跑哪些測試」，建議用 `-Dtest=...` 明確列出類名。
+
+### 4.4 測試報告位置
+
+```bash
+ls target/surefire-reports
+```
+
+## 5. 測試資料與帳號（dev seed）
+
+資料來源：
+- `src/main/resources/db/dev-migration/R__dev_seed.sql`
+
+目前 seed 帳號（`members` 與 `employee` 兩邊同步存在）：
 - `member01 / member01`
 - `test123 / test123`
 - `emp01 / emp01`
@@ -123,9 +137,10 @@ mvn test -Djacoco.skip=true -Dbrowser.e2e=true -Dtest=BrowserAuthE2EPlaywrightTe
 登入入口：
 - 會員：`/member/login`
 - 員工：`/employee/login`
-- 統一入口（會轉發到正確的登入處理）：`/login?target=member`、`/login?target=employee`
+- 統一入口：`/login?target=member`、`/login?target=employee`
 
-### 查詢目前帳號清單與角色
+查詢帳號與角色：
+
 ```sql
 SELECT 'members' AS tbl, id, nickname, LEFT(password, 24) AS password_prefix
 FROM members
@@ -138,124 +153,49 @@ JOIN roles r ON r.id = e.role_id
 ORDER BY e.nickname;
 ```
 
-### 升級/降級員工角色（用來 demo IT / 主管 / 管理頁）
-員工後台導向與權限取決於 `employee.role_id -> roles.code/level`。
+## 6. CI 與覆蓋率門檻
 
-如果你已經有 ADMIN 權限，也可以直接用後台頁面操作：
-- `/employee/admin/roles`
+CI 設定：
+- `.github/workflows/ci.yml`
 
-將指定員工升級為 IT：
-```sql
-UPDATE employee
-SET role_id = (SELECT id FROM roles WHERE code = 'IT' LIMIT 1)
-WHERE nickname = 'member01';
-```
+目前門檻：
+- 測試總數基線：至少 50（CI 會檢查）
+- JaCoCo LINE 覆蓋率：`>= 50%`（`pom.xml` 設定）
 
-升級為 MANAGER：
-```sql
-UPDATE employee
-SET role_id = (SELECT id FROM roles WHERE code = 'MANAGER' LIMIT 1)
-WHERE nickname = 'member01';
-```
+CI 另有 `browser-e2e` job：
+- 安裝 Playwright Chromium
+- 執行 `BrowserAuthE2EPlaywrightTest`
 
-升級為 ADMIN：
-```sql
-UPDATE employee
-SET role_id = (SELECT id FROM roles WHERE code = 'ADMIN' LIMIT 1)
-WHERE nickname = 'member01';
-```
+## 7. 常見問題
 
-降回一般員工 EMPLOYEE：
-```sql
-UPDATE employee
-SET role_id = (SELECT id FROM roles WHERE code = 'EMPLOYEE' LIMIT 1)
-WHERE nickname = 'member01';
-```
+### Q1：為什麼 `mvn clean test` 不需要本機 MySQL？
 
-### 運行特定測試類
+A：測試 profile 使用 H2 in-memory（`src/test/resources/application-test.properties`），不是走你本機 MySQL。
+
+### Q2：看到 `Communications link failure` 代表什麼？
+
+A：通常發生在你啟動應用程式（dev/prod）或手動用 MySQL 的流程，不是基線測試本身；請檢查 `.env` 的 `DB_URL/DB_USERNAME/DB_PASSWORD` 與本機 MySQL 狀態。
+
+### Q3：如何跳過測試？
+
+A：
+
 ```bash
-# 運行電影服務測試
-mvn test -Dtest=MovieServiceTest
-
-# 運行會話服務測試
-mvn test -Dtest=SessionServiceTest
-
-# 運行會員 API 控制器測試
-mvn test -Dtest=MemberApiControllerTest
-
-# 運行整合測試
-mvn test -Dtest=MovieIntegrationTest
+mvn install -DskipTests
 ```
 
-### 查看測試摘要報告
+### Q4：如何只跑瀏覽器 E2E？
+
+A：
+
 ```bash
-ls target/surefire-reports
+PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers \
+PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+mvn -Djacoco.skip=true -Dbrowser.e2e=true -Dtest=BrowserAuthE2EPlaywrightTest test
 ```
 
-## 測試覆蓋率目標
+## 8. 維護原則
 
-- **CI 硬性門檻（JaCoCo）**: 整體 LINE 覆蓋率 >= 50%（以 `pom.xml` 設定為準）
-- **團隊目標值**: 服務層 > 80%、控制器層 > 70%、整體 > 75%（逐步提升）
-
-## 測試最佳實踐
-
-1. **命名規範**: 使用 `@DisplayName` 註解提供清晰的中文測試描述
-2. **Given-When-Then**: 遵循 AAA (Arrange-Act-Assert) 模式
-3. **獨立性**: 每個測試應該獨立運行，不依賴其他測試
-4. **清理**: 使用 `@BeforeEach` 和 `@AfterEach` 進行測試前後的設置和清理
-5. **斷言**: 使用有意義的斷言消息
-
-## 持續整合
-
-建議在 CI/CD 流程中自動運行測試：
-
-```yaml
-# GitHub Actions 範例
-- name: Run tests
-  run: mvn clean test
-
-- name: Enforce test baseline
-  run: |
-    total_tests=$(grep -Rho 'tests="[0-9]\+"' target/surefire-reports/*.xml | grep -Eo '[0-9]+' | awk '{sum+=$1} END {print sum+0}')
-    test "${total_tests}" -ge 50
-```
-
-## 測試數據
-
-測試使用以下數據：
-- **電影數量**: 10 部
-- **座位配置**: 12 排 × 8 列 = 96 個座位
-- **場次數量**: 每部電影 5-6 個場次
-
-## 常見問題
-
-### Q: 測試失敗怎麼辦？
-A: 檢查測試日誌，確認是否有依賴問題或配置錯誤。
-
-### Q: 如何跳過測試？
-A: 使用 `mvn install -DskipTests` 或 `mvn install -Dmaven.test.skip=true`
-
-### Q: 如何只運行單元測試（不包括整合測試）？
-A: 使用 `mvn test -Dtest=*Test`
-
-### Q: 如何只運行整合測試？
-A: 使用 `mvn test -Dtest=*IntegrationTest`
-
-## 測試維護
-
-- 每次添加新功能時，應該同時添加相應的測試
-- 定期檢查測試覆蓋率，確保關鍵業務邏輯都有測試
-- 當測試失敗時，先修復測試再修復代碼
-- 保持測試代碼的可讀性和可維護性
-
-## 總結
-
-本測試套件提供了全面的測試覆蓋，確保電影院系統的核心功能正常運作。通過這些測試，我們可以：
-
-1. 及早發現 bug
-2. 安全地重構代碼
-3. 確保新功能不會破壞現有功能
-4. 提供代碼使用範例
-5. 作為文檔參考
-
-**總測試數量**: 請以 `mvn test`/CI 輸出為準（避免文件數字過期）。
+- 新功能必須附對應測試或補測計畫
+- 若測試失敗，先確認是程式回歸還是測試本身過期
+- 測試數量與覆蓋率以 CI 作為主準據
