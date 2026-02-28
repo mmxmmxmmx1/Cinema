@@ -44,3 +44,7 @@ build/
 
 # Playwright browsers cache
 .playwright-browsers/
+
+# Local tool/cache folders
+.gemini/
+.m2-local/

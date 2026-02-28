@@ -29,7 +29,7 @@ mvn -Dtest=MemberOrderWebE2EIntegrationTest,SecurityAccessIntegrationTest,HomeUi
   - 員工登入/登出
   - 匿名使用者直接開啟 `movies/checkout/orders` 深連結導回首頁
 
-執行方式（不使用 Docker）：
+執行方式：
 
 先一次性安裝 Chromium：
 
@@ -58,16 +58,6 @@ sudo apt-get install -y libicu74 libvpx9
 ```
 
 若發行版版本不同，先用 `apt-cache policy libicu* libvpx*` 查可用套件名稱。
-
-## 3) 真 MySQL 容器整合測試
-
-Playwright 之外，另有真 MySQL 測試（Testcontainers）：
-
-```bash
-mvn -Djacoco.skip=true -Dmysql.it=true -Dtest=RealMySqlContainerIntegrationTest test
-```
-
-必要條件：Docker daemon 可用。
 
 ## 後續擴充（可選）
 

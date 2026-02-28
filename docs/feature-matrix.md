@@ -30,7 +30,6 @@
 | 單元/整合測試 | Maven `clean test` | 已完成 | 失敗即阻擋 |
 | 覆蓋率門檻 | JaCoCo line coverage >= 50% | 已完成 | 作品展示門檻 |
 | 瀏覽器 E2E | Playwright 登入/登出 smoke | 已完成 | CI 獨立 job |
-| 容器化 | Dockerfile + docker-compose | 已完成 | 本機可快速啟動 |
 | 觀測與治理文件 | Runbook / 監控 / 資料治理 | 已完成 | `docs/` 已提供 |
 
 ## 明確不納入（本作品刻意排除）

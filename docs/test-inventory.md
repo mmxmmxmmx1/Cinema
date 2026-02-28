@@ -58,17 +58,7 @@ PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
 mvn -Djacoco.skip=true -Dbrowser.e2e=true -Dtest=BrowserAuthE2EPlaywrightTest test
 ```
 
-### 真 MySQL（Testcontainers）
-
-- 類別：`src/test/java/com/example/cinema/integration/RealMySqlContainerIntegrationTest.java`
-- 啟用方式：
-
-```bash
-mvn -Djacoco.skip=true -Dmysql.it=true -Dtest=RealMySqlContainerIntegrationTest test
-```
-
 ## 建議執行順序
 
-1. 先跑基線：`mvn -Dtest='*Test,!RealMySqlContainerIntegrationTest' test`
+1. 先跑基線：`mvn clean test`
 2. 再跑瀏覽器 E2E（如需 UI 驗證）
-3. 最後跑真 MySQL（如需驗證 migration 與 DB 相容）

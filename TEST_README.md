@@ -73,9 +73,9 @@ find src/test/java -name '*Test.java' -o -name '*IntegrationTest.java'
 mvn test
 ```
 
-### 日常基線（不使用 Docker）
+### 日常基線
 ```bash
-mvn -Dtest='*Test,!RealMySqlContainerIntegrationTest' test
+mvn clean test
 ```
 
 ### 選配：瀏覽器 E2E（Playwright）
@@ -98,13 +98,6 @@ java -cp "$CP" com.microsoft.playwright.CLI install chromium
 PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers \
 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
 mvn test -Djacoco.skip=true -Dbrowser.e2e=true -Dtest=BrowserAuthE2EPlaywrightTest
-```
-
-### 選配：真 MySQL 整合測試（Testcontainers）
-需要本機可用 Docker。預設不啟用。
-
-```bash
-mvn test -Djacoco.skip=true -Dmysql.it=true -Dtest=RealMySqlContainerIntegrationTest
 ```
 
 ## Demo 帳號與資料庫操作 (MySQL)
