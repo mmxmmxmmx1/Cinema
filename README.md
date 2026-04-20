@@ -1,6 +1,6 @@
 # Cinema (Spring Boot Side Project)
 
-最後修改日期：`2026-02-28`
+最後修改日期：`2026-04-20`
 
 電影院訂票 side project，技術棧為 Spring Boot + Thymeleaf + MySQL。
 
@@ -21,6 +21,49 @@
 - 員工後台（每日待辦、影廳檢查表、維修申請）
 - 管理員功能（角色管理、場次管理：新增/更新/停用）
 - API 防刷限流 + Trace Id 錯誤追蹤
+
+## Demo Preview
+
+### 首頁
+
+![首頁](docs/screenshots/home.png)
+
+### 會員訂票流程
+
+![會員訂票流程](docs/screenshots/booking-flow.png)
+
+### 選位頁
+
+![選位頁](docs/screenshots/seat-selection.png)
+
+### 訂單中心
+
+![訂單中心](docs/screenshots/member-orders.png)
+
+### 員工後台
+
+![員工後台](docs/screenshots/employee-dashboard.png)
+
+### 管理員電影管理
+
+![管理員電影管理](docs/screenshots/admin-movies.png)
+
+### 管理員場次管理
+
+![管理員場次管理](docs/screenshots/admin-showtimes.png)
+
+## Demo Accounts
+
+> dev seed 帳號來源：`src/main/resources/db/dev-migration/R__dev_seed.sql`
+
+| 角色 | 帳號 | 密碼 | 說明 |
+|---|---|---|---|
+| 會員 | `member01` | `member01` | 會員登入、訂票、訂單、通知與點數流程 |
+| 會員 | `test123` | `test123` | 一般會員測試帳號 |
+| 員工 | `emp01` | `emp01` | 員工後台、影廳檢查表與維修流程 |
+| 員工 | `em01` | `em01` | 一般員工測試帳號 |
+
+目前 dev seed 的員工帳號預設為 `EMPLOYEE` 角色；若要展示管理員頁面，可在本機 demo DB 中將指定員工調整為 `ADMIN`。
 
 ## 架構快覽
 
