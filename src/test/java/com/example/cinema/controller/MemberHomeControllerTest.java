@@ -3,12 +3,12 @@ package com.example.cinema.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
 import java.util.List;
 
@@ -16,30 +16,23 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.example.cinema.service.EmployeeTodoService;
 import com.example.cinema.service.MemberLoyaltyService;
 import com.example.cinema.service.MemberNotificationService;
 import com.example.cinema.service.MemberOrderService;
-import com.example.cinema.service.MovieService;
-import com.example.cinema.service.OperationsDashboardService;
 import com.example.cinema.service.SessionService;
 import com.example.cinema.service.SessionService.Realm;
 
-@WebMvcTest(PageController.class)
+@WebMvcTest(MemberHomeController.class)
 @AutoConfigureMockMvc
-class PageControllerMemberPageTest {
+@Import(PageSessionSupport.class)
+class MemberHomeControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
-
-    @MockitoBean
-    private MovieService movieService;
-
-    @MockitoBean
-    private EmployeeTodoService employeeTodoService;
 
     @MockitoBean
     private MemberLoyaltyService memberLoyaltyService;
@@ -49,9 +42,6 @@ class PageControllerMemberPageTest {
 
     @MockitoBean
     private MemberNotificationService memberNotificationService;
-
-    @MockitoBean
-    private OperationsDashboardService operationsDashboardService;
 
     @MockitoBean
     private SessionService sessionService;

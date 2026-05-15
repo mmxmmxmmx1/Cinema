@@ -1,0 +1,130 @@
+body.auth-page {
+  font-family: "Noto Sans TC", "Segoe UI", Arial, sans-serif;
+  margin: 0;
+  background: var(--auth-bg);
+  color: #f4f6ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+body.auth-member-login {
+  --auth-bg: #0f1426;
+  --auth-panel-bg: rgba(18, 22, 48, 0.88);
+  --auth-focus-border: #6da4ff;
+  --auth-focus-bg: rgba(109, 164, 255, 0.12);
+}
+
+body.auth-employee-login {
+  --auth-bg: #0e1323;
+  --auth-panel-bg: rgba(18, 22, 48, 0.9);
+  --auth-focus-border: #70b3ff;
+  --auth-focus-bg: rgba(112, 179, 255, 0.12);
+}
+
+.login-panel {
+  background: var(--auth-panel-bg);
+  padding: 48px 56px;
+  border-radius: 28px;
+  box-shadow: 0 24px 60px rgba(3, 6, 20, 0.65);
+  width: min(420px, 90%);
+  display: grid;
+  gap: 28px;
+}
+
+.login-panel h1 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: 1px;
+  text-align: center;
+}
+
+.login-panel p {
+  margin: 0;
+  color: #b9bedb;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.login-panel form {
+  display: grid;
+  gap: 20px;
+}
+
+.login-panel label {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.login-panel input {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 16px;
+  outline: none;
+  transition: border 0.2s ease, background 0.2s ease;
+}
+
+.login-panel input:focus {
+  border-color: var(--auth-focus-border);
+  background: var(--auth-focus-bg);
+}
+
+.login-panel button {
+  padding: 14px 0;
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #4f8cff, #7aa6ff);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.login-panel button:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+}
+
+.error {
+  background: rgba(255, 107, 107, 0.18);
+  border: 1px solid rgba(255, 107, 107, 0.6);
+  padding: 12px 16px;
+  border-radius: 14px;
+  color: #ffd7d7;
+  font-size: 14px;
+  text-align: center;
+}
+
+.countdown-line {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #ffeaea;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  align-items: center;
+}
+
+.countdown-value {
+  font-weight: 600;
+}
+
+.back-home {
+  text-align: center;
+  font-size: 14px;
+}
+
+.back-home a {
+  color: #8ec7ff;
+  text-decoration: none;
+}
+
+.back-home a:hover {
+  text-decoration: underline;
+}

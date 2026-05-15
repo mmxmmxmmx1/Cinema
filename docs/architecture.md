@@ -7,6 +7,19 @@
 - `DAO/JdbcTemplate`：讀寫 MySQL。
 - `Flyway`：資料庫 schema 與資料結構演進。
 
+### 頁面 Controller 邊界
+
+- `AuthPageController`：統一登入入口、會員登入頁、員工登入頁。
+- `MemberHomeController`：會員首頁與會員活動心跳。
+- `EmployeeHomeController`：員工首頁、IT/主管/管理員 dashboard 與員工活動心跳。
+- `PageSessionSupport`：頁面 controller 共用的登入狀態、鎖定訊息與最後活動時間更新。
+
+### 前端樣式邊界
+
+- `static/css/auth.css`：會員/員工登入頁共用樣式，登入頁只以 body class 切換差異。
+- `static/css/member-area.css`：會員專區 Thymeleaf 頁面共用樣式。
+- `static/css/styles.css`：首頁 SPA 與共用浮動選單樣式。
+
 ## 2. 核心流程
 
 1. 會員選位建立 `PENDING` 訂單（不先占座）。

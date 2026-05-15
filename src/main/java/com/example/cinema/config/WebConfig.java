@@ -18,7 +18,7 @@ public class WebConfig implements WebMvcConfigurer {
         // Forward the root path to the SPA entry point. Do **not** forward
         // '/login' or '/post-login' here so that the dedicated login pages for
         // members and employees can be served by their respective controllers.
-        // See PageController for member and employee login mappings.
+        // See AuthPageController for member and employee login mappings.
         registry.addViewController("/").setViewName("forward:/index.html");
     }
 
