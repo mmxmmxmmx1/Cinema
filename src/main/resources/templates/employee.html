@@ -58,6 +58,17 @@
             margin-top: 0;
             box-sizing: border-box;
         }
+        .bottom-actions .home-link {
+            background: transparent;
+            color: #9ad0ff;
+            padding: 0;
+            min-height: auto;
+            border-radius: 0;
+        }
+        .bottom-actions .home-link:hover {
+            background: transparent;
+            text-decoration: underline;
+        }
         .is-hidden { display: none; }
         .todo-textarea {
             width: 98%;
@@ -169,7 +180,7 @@
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <button type="submit">登出員工帳號</button>
         </form>
-        <a class="btn-link" href="/">返回首頁</a>
+        <a class="btn-link home-link" href="/">返回首頁</a>
     </div>
     
     <form id="employee-auto-logout" method="post" action="/employee/logout" hidden>
