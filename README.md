@@ -1,6 +1,6 @@
 # Cinema (Spring Boot Side Project)
 
-最後修改日期：`2026-04-20`
+最後修改日期：`2026-05-28`
 
 電影院訂票 side project，技術棧為 Spring Boot + Thymeleaf + MySQL。
 
@@ -10,6 +10,7 @@
 - Java：`17`
 - 資料庫：MySQL `8.0.x`（建議 `8.0.36+`）
 - 前端：Vue（本機靜態檔）+ Thymeleaf
+- 圖片素材：本機靜態資源 `src/main/resources/static/images`
 - 付款：預設 `mock`（可由環境變數覆寫）
 - 通知：預設 `inapp`（可由環境變數覆寫）
 
@@ -22,35 +23,36 @@
 - 管理員功能（角色管理、場次管理：新增/更新/停用）
 - API 防刷限流 + Trace Id 錯誤追蹤
 
-## Demo Preview
+## 目前 Demo 素材
 
-### 首頁
+README 內的圖片直接引用目前專案內的本機靜態素材，不再依賴外部 IMDb 或第三方海報連結。
 
-![首頁](docs/screenshots/home.png)
+### 品牌圖
 
-### 會員訂票流程
+<img src="src/main/resources/static/images/sleep.jpg" width="180" alt="很好睡電影院品牌圖">
 
-![會員訂票流程](docs/screenshots/booking-flow.png)
+### 電影目錄與圖片對照
 
-### 選位頁
+| ID | 電影名稱 | 直式海報 | 首頁輪播圖 | 說明 |
+|---|---|---|---|---|
+| `mv-01` | 貓砂:第二部 | <img src="src/main/resources/static/images/貓砂(1).png" width="80" alt="貓砂:第二部直式海報"> | <img src="src/main/resources/static/images/貓砂(2).png" width="160" alt="貓砂:第二部首頁輪播圖"> | 保羅貓崔迪與貓妮以及弗瑞曼貓人聯手,向毀滅他家族的陰謀者展開報復。 |
+| `mv-02` | 貓本海默 | <img src="src/main/resources/static/images/貓本海默(2).png" width="80" alt="貓本海默直式海報"> | <img src="src/main/resources/static/images/貓本海默(1).png" width="160" alt="貓本海默首頁輪播圖"> | 貓伯特貓本海默的一生,從他在原子彈研發中的角色,到他面臨的道德困境。 |
+| `mv-03` | 狗狗人:穿越新宇宙 | <img src="src/main/resources/static/images/狗狗人(1).png" width="80" alt="狗狗人:穿越新宇宙直式海報"> | <img src="src/main/resources/static/images/狗狗人(2).png" width="160" alt="狗狗人:穿越新宇宙首頁輪播圖"> | 狗爾斯摩拉斯再次穿越多重宇宙,與其他狗狗人並肩作戰。 |
+| `mv-04` | 星際貓攻隊3 | <img src="src/main/resources/static/images/星際貓攻隊3(1).png" width="80" alt="星際貓攻隊3直式海報"> | <img src="src/main/resources/static/images/星際貓攻隊3(2).png" width="160" alt="星際貓攻隊3首頁輪播圖"> | 貓爵與他的團隊踏上一場全新的冒險,面對來自宇宙的威脅。 |
+| `mv-05` | 狗比 | <img src="src/main/resources/static/images/狗比(1).png" width="80" alt="狗比直式海報"> | <img src="src/main/resources/static/images/狗比(2).png" width="160" alt="狗比首頁輪播圖"> | 狗比與肯踏上現實世界的旅程,發現真實生活的美好與挑戰。 |
+| `mv-06` | 不可能的任務-貓咪神算 | <img src="src/main/resources/static/images/不可能的任務-貓咪神算(1).png" width="80" alt="不可能的任務-貓咪神算直式海報"> | <img src="src/main/resources/static/images/不可能的任務-貓咪神算(2).png" width="160" alt="不可能的任務-貓咪神算首頁輪播圖"> | TICA 探員貓森韓特面對他職業生涯中最致命的任務。 |
+| `mv-07` | 捍衛狗狗4 | <img src="src/main/resources/static/images/捍衛狗狗4(2_3).png" width="80" alt="捍衛狗狗4直式海報"> | <img src="src/main/resources/static/images/捍衛狗狗4(16_9).png" width="160" alt="捍衛狗狗4首頁輪播圖"> | 約翰狗狗尋找擊敗高桌會的方法,以贏回他的自由。 |
+| `mv-08` | 貓貓俠 | <img src="src/main/resources/static/images/貓貓俠(1).png" width="80" alt="貓貓俠直式海報"> | <img src="src/main/resources/static/images/貓貓俠(2).png" width="160" alt="貓貓俠首頁輪播圖"> | 布魯斯貓恩在高譚市擔任蝙蝠俠的第二年,追蹤一名殘忍的連環殺手。 |
+| `mv-09` | 阿凡狗_誰之道 | <img src="src/main/resources/static/images/阿凡狗_誰之道(1).png" width="80" alt="阿凡狗_誰之道直式海報"> | <img src="src/main/resources/static/images/阿凡狗_誰之道(2).png" width="160" alt="阿凡狗_誰之道首頁輪播圖"> | 狗克蘇里與狗蒂莉在潘朵拉星球建立家庭,面對新的威脅。 |
+| `mv-10` | 黑貓-烏干達萬歲 | <img src="src/main/resources/static/images/黑貓-烏干達萬歲(1).png" width="80" alt="黑貓-烏干達萬歲直式海報"> | <img src="src/main/resources/static/images/黑貓-烏干達萬歲(2).png" width="160" alt="黑貓-烏干達萬歲首頁輪播圖"> | 烏干達王國的領袖們為了保護國家,與強大的海底王國對抗。 |
 
-![選位頁](docs/screenshots/seat-selection.png)
+素材維護位置：
+- fallback catalog：`src/main/java/com/example/cinema/service/MovieService.java`
+- DB 圖片對照：`src/main/resources/db/migration/R__movie_catalog_assets.sql`
+- 已套用資料庫的名稱/描述修正：`src/main/resources/db/migration/V29__...sql` 到 `V39__...sql`
+- 圖片檔：`src/main/resources/static/images`
 
-### 訂單中心
-
-![訂單中心](docs/screenshots/member-orders.png)
-
-### 員工後台
-
-![員工後台](docs/screenshots/employee-dashboard.png)
-
-### 管理員電影管理
-
-![管理員電影管理](docs/screenshots/admin-movies.png)
-
-### 管理員場次管理
-
-![管理員場次管理](docs/screenshots/admin-showtimes.png)
+歷史 UI 截圖仍保留在 `docs/screenshots/`，但 README 主要展示以上目前實際使用的素材。
 
 ## Demo Accounts
 

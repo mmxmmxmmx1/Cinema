@@ -7,7 +7,7 @@ SET poster_url = '/images/貓砂(1).png'
 WHERE movie_id = 'mv-01';
 
 UPDATE movie_catalog
-SET poster_url = '/images/貓本海默(1).png'
+SET poster_url = '/images/貓本海默(2).png'
 WHERE movie_id = 'mv-02';
 
 UPDATE movie_catalog
@@ -47,7 +47,7 @@ SET carousel_image_url = '/images/貓砂(2).png'
 WHERE movie_id = 'mv-01';
 
 UPDATE movie_catalog
-SET carousel_image_url = '/images/貓本海默(2).png'
+SET carousel_image_url = '/images/貓本海默(1).png'
 WHERE movie_id = 'mv-02';
 
 UPDATE movie_catalog
