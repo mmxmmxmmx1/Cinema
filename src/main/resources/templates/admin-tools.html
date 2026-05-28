@@ -69,7 +69,7 @@
             <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <label for="movieId">電影：</label>
             <select id="movieId" name="movieId" required>
-                <option th:each="m : ${catalogItems}" th:value="${m.id()}" th:text="${m.id() + '｜' + m.title()}">mv-01｜沙丘:第二部</option>
+                <option th:each="m : ${catalogItems}" th:value="${m.id()}" th:text="${m.id() + '｜' + m.title()}">mv-01｜貓砂:第二部</option>
             </select>
             <div class="spacer-sm"></div>
             <label for="posterUrl">海報網址（https://... 或 /images/...）：</label>

@@ -122,7 +122,7 @@ class MemberApiControllerTest {
                         AuthorityUtils.createAuthorityList("ROLE_MEMBER"))));
         when(memberLoyaltyService.currentPoints(any())).thenReturn(360);
         when(memberOrderService.listUpcomingBookings(any(), eq(5))).thenReturn(List.of(
-                new UpcomingBookingResponse(1L, "mv-01", "沙丘:第二部", "mv-01-st1", "1號廳", 2, null, "02/12 18:40")));
+                new UpcomingBookingResponse(1L, "mv-01", "貓砂:第二部", "mv-01-st1", "1號廳", 2, null, "02/12 18:40")));
 
         // When & Then
         mockMvc.perform(get("/api/member/summary")
@@ -131,7 +131,7 @@ class MemberApiControllerTest {
                 .andExpect(jsonPath("$.points").value(360))
                 .andExpect(jsonPath("$.upcomingBookings").isArray())
                 .andExpect(jsonPath("$.upcomingBookings.length()").value(1))
-                .andExpect(jsonPath("$.upcomingBookings[0].movieTitle").value("沙丘:第二部"));
+                .andExpect(jsonPath("$.upcomingBookings[0].movieTitle").value("貓砂:第二部"));
     }
 
     @Test

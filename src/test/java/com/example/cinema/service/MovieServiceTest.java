@@ -56,7 +56,7 @@ class MovieServiceTest {
         // Then
         assertTrue(movie.isPresent(), "應該找到電影");
         assertEquals(movieId, movie.get().getId(), "電影 ID 應該匹配");
-        assertEquals("沙丘:第二部", movie.get().getTitle(), "電影標題應該匹配");
+        assertEquals("貓砂:第二部", movie.get().getTitle(), "電影標題應該匹配");
     }
 
     @Test

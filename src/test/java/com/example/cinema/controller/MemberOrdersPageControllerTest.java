@@ -82,7 +82,7 @@ class MemberOrdersPageControllerTest {
                 new OrderSummaryResponse(1L, "mv-02", "mv-02-st1", "1號廳", 4, 1200, "PAID",
                         Instant.parse("2026-02-12T00:00:00Z"), Instant.parse("2026-02-12T00:05:00Z"), showStart)));
         when(movieService.getMovieWithAvailability("mv-02"))
-                .thenReturn(Optional.of(new Movie("mv-02", "奧本海默", "", "", "", List.of())));
+                .thenReturn(Optional.of(new Movie("mv-02", "貓本海默", "", "", "", List.of())));
         when(movieService.getShowtime("mv-02", "mv-02-st1"))
                 .thenReturn(Optional.empty());
 
