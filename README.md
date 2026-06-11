@@ -1,6 +1,6 @@
 # Cinema 電影訂票系統｜Java Spring Boot 後端作品集
 
-最後修改日期：`2026-05-28`
+Version: v1.0 Portfolio Release
 
 電影院訂票 side project，技術棧為 Spring Boot + Thymeleaf + MySQL。
 
