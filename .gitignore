@@ -48,3 +48,6 @@ build/
 # Local tool/cache folders
 .gemini/
 .m2-local/
+
+# Local private development notes
+private-notes/
