@@ -1,4 +1,4 @@
-# Cinema (Spring Boot Side Project)
+# Cinema 電影訂票系統｜Java Spring Boot 後端作品集
 
 最後修改日期：`2026-05-28`
 
